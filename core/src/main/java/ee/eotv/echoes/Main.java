@@ -7,72 +7,74 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 
 public class Main extends ApplicationAdapter {
-
-    // --- MANAŽERID ---
     private LevelManager levelManager;
     private Player player;
     private Enemy zombi;
     private StoneManager stoneManager;
-
-    // --- GRAAFIKA ---
     private OrthographicCamera camera;
     private Box2DDebugRenderer debugRenderer;
 
+    // Staatiline viide, et teised klassid saaksid zombile sündmusi saata
+    public static Enemy zombiInstance;
+
     @Override
     public void create() {
-        // 1. Kaamera
         camera = new OrthographicCamera();
         camera.setToOrtho(false, 40, 30);
 
-        // 2. Tase (Maailm ja Seinad)
         levelManager = new LevelManager();
 
-        // 3. Tegelased
-        // Anname mängijale Leveli maailma ja valguse
-        player = new Player(levelManager.world, levelManager.rayHandler, 5, 5);
-        zombi = new Enemy(levelManager.world, 15, 10);
+        // Mängija (2, 14) ja Zombi (18, 10) on uues mapi skeemis vabad kohad
+        player = new Player(levelManager.world, levelManager.rayHandler, 2, 14);
+        zombi = new Enemy(levelManager.world, 18, 10);
+        zombiInstance = zombi;
 
-        // 4. Kivid
-        stoneManager = new StoneManager(levelManager.world);
+        stoneManager = new StoneManager(levelManager.world, levelManager);
 
-        // 5. Debug joonistaja (rohelised kastid)
         debugRenderer = new Box2DDebugRenderer();
     }
 
     @Override
     public void render() {
-        // 1. Kontrolli kas mäng on läbi (zombi sai kätte)
+        // 1. Kontrolli surma (Restart)
         if (levelManager.contactListener.isGameOver) {
-            // Restart
-            dispose();
             create();
             return;
         }
 
-        // 2. Sisend (Mängija ja Kivid)
+        // 2. Sisendi ja loogika uuendused
         player.handleInput(camera);
         stoneManager.handleInput(player, camera);
 
-        // 3. Loogika uuendused
         levelManager.update(Gdx.graphics.getDeltaTime());
         stoneManager.update(Gdx.graphics.getDeltaTime());
 
-        // Zombi uuendamine (anname talle mängija koordinaadid numbritena!)
-        zombi.update(player.getPosition().x, player.getPosition().y);
+        if (zombi != null) {
+            zombi.update(player); // AI reageerib nüüd mängija taskulambile
+        }
 
-        // 4. Kaamera järgib mängijat
+        // 3. Kaamera liigutamine
         camera.position.set(player.getPosition(), 0);
         camera.update();
 
-        // 5. Joonistamine
+        // 4. JOONISTAMINE (Järjekord on ülioluline!)
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Valgus
+        // A) Joonistame seina ja põranda tekstuurid (hallid kastid)
+        levelManager.drawWorld(camera);
+
+        // B) Joonistame tegelaste ikoonid
+        levelManager.drawCharacters(player, zombi, camera);
+
+        // C) Joonistame valguse (see peidab kõik muu pimedusse ja valgustab ainult vihtu)
         levelManager.renderLights(camera);
 
-        // Debug jooned (seinad ja kehad)
-        debugRenderer.render(levelManager.world, camera.combined);
+        // Trajektoor
+        stoneManager.renderTrajectory(player, camera);
+
+        // D) Debug vaade (Võta kommentaar eest, kui tahad näha füüsika piire)
+        // debugRenderer.render(levelManager.world, camera.combined);
     }
 
     @Override

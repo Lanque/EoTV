@@ -3,67 +3,58 @@ package ee.eotv.echoes;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
-import box2dLight.RayHandler;
 import box2dLight.ConeLight;
-import com.badlogic.gdx.graphics.Color;
+import box2dLight.RayHandler;
 
 public class Player {
     private Body body;
     private ConeLight flashlight;
     private float speed = 5.0f;
+    public boolean isLightOn = true; // Taskulambi olek
 
     public Player(World world, RayHandler rayHandler, float x, float y) {
-        // 1. Keha
         BodyDef def = new BodyDef();
         def.type = BodyDef.BodyType.DynamicBody;
         def.position.set(x, y);
         def.fixedRotation = true;
         body = world.createBody(def);
-        body.setUserData("PLAYER"); // Silt kokkupõrgete jaoks
+        body.setUserData("PLAYER");
 
         CircleShape shape = new CircleShape();
-        shape.setRadius(0.5f);
-        FixtureDef fdef = new FixtureDef();
-        fdef.shape = shape;
-        fdef.density = 1.0f;
-        body.createFixture(fdef);
+        shape.setRadius(0.4f);
+        body.createFixture(shape, 1.0f);
         shape.dispose();
 
-        // 2. Taskulamp
-        flashlight = new ConeLight(rayHandler, 100, Color.CORAL, 30, x, y, 0, 30);
+        // VÕIMSAM TASKULAMP: Kaugus 45, kiirte arv 200 (teravam), vihk 35 kraadi
+        flashlight = new ConeLight(rayHandler, 200, new Color(1f, 1f, 0.9f, 1f), 45f, x, y, 0, 35f);
         flashlight.attachToBody(body);
+        flashlight.setSoft(true);
     }
 
     public void handleInput(Camera camera) {
-        // Liikumine (WASD)
-        float velX = 0;
-        float velY = 0;
+        // Taskulambi lülitamine (Tühik või F)
+        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+            isLightOn = !isLightOn;
+            flashlight.setActive(isLightOn);
+        }
 
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) velY = speed;
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) velY = -speed;
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) velX = -speed;
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) velX = speed;
+        float vx = 0, vy = 0;
+        if (Gdx.input.isKeyPressed(Input.Keys.W)) vy = speed;
+        if (Gdx.input.isKeyPressed(Input.Keys.S)) vy = -speed;
+        if (Gdx.input.isKeyPressed(Input.Keys.A)) vx = -speed;
+        if (Gdx.input.isKeyPressed(Input.Keys.D)) vx = speed;
+        body.setLinearVelocity(vx, vy);
 
-        body.setLinearVelocity(velX, velY);
-
-        // Pööramine hiire suunas
-        Vector3 mousePos = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mousePos);
-
-        float angle = MathUtils.atan2(mousePos.y - body.getPosition().y, mousePos.x - body.getPosition().x);
-        // Box2D tahab radiaane, ConeLight hoolitseb ise
+        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        camera.unproject(mouse);
+        float angle = MathUtils.atan2(mouse.y - body.getPosition().y, mouse.x - body.getPosition().x);
         body.setTransform(body.getPosition(), angle);
     }
 
-    public Vector2 getPosition() {
-        return body.getPosition();
-    }
-
-    public Body getBody() {
-        return body;
-    }
+    public Vector2 getPosition() { return body.getPosition(); }
 }

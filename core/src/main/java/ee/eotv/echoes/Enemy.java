@@ -5,45 +5,46 @@ import com.badlogic.gdx.physics.box2d.*;
 
 public class Enemy {
     public Body body;
-    private float speed = 3.0f;
+    private float speed = 3.2f;
+    private Vector2 targetPos; // Kuhu zombi parajasti liigub
 
     public Enemy(World world, float x, float y) {
-        createBody(world, x, y);
+        BodyDef def = new BodyDef();
+        def.type = BodyDef.BodyType.DynamicBody;
+        def.position.set(x, y);
+        def.fixedRotation = true;
+        body = world.createBody(def);
+        body.setUserData("ENEMY");
+
+        CircleShape s = new CircleShape(); s.setRadius(0.35f);
+        body.createFixture(s, 1.0f); s.dispose();
+        targetPos = new Vector2(x, y); // Alguses seisab paigal
     }
 
-    private void createBody(World world, float x, float y) {
-        BodyDef bodyDef = new BodyDef();
-        bodyDef.type = BodyDef.BodyType.DynamicBody;
-        bodyDef.position.set(x, y);
-        bodyDef.fixedRotation = true;
-
-        this.body = world.createBody(bodyDef);
-        this.body.setUserData("ENEMY");
-
-        CircleShape circle = new CircleShape();
-        circle.setRadius(0.4f);
-
-        FixtureDef fixtureDef = new FixtureDef();
-        fixtureDef.shape = circle;
-        fixtureDef.density = 1.0f;
-        fixtureDef.friction = 0.0f;
-        fixtureDef.restitution = 0.1f;
-
-        this.body.createFixture(fixtureDef);
-        circle.dispose();
+    // Meetod, mida kutsutakse kivi maandumisel
+    public void investigate(float x, float y) {
+        targetPos.set(x, y);
     }
 
-    // SEE ON SEE UUS JA OHUTU MEETOD
-    // Me võtame vastu ainult numbreid (X ja Y), mitte "nööri" (Vector2)
-    public void update(float playerX, float playerY) {
+    public void update(Player player) {
         Vector2 myPos = body.getPosition();
+        Vector2 playerPos = player.getPosition();
+        float distToPlayer = myPos.dst(playerPos);
 
-        float diffX = playerX - myPos.x;
-        float diffY = playerY - myPos.y;
+        // REEGLID:
+        // 1. Kui mängija taskulamp on sees ja ta on piisavalt lähedal (25m), jälita mängijat
+        if (player.isLightOn && distToPlayer < 25f) {
+            targetPos.set(playerPos);
+        }
 
-        Vector2 direction = new Vector2(diffX, diffY);
-        direction.nor().scl(speed);
-
-        body.setLinearVelocity(direction);
+        // Liikumine sihtmärgi poole (kui on piisavalt kaugel)
+        if (myPos.dst(targetPos) > 0.5f) {
+            Vector2 dir = new Vector2(targetPos.x - myPos.x, targetPos.y - myPos.y);
+            body.setLinearVelocity(dir.nor().scl(speed));
+        } else {
+            body.setLinearVelocity(0, 0); // Jõudis kohale / seisab paigal
+        }
     }
+
+    public Vector2 getPosition() { return body.getPosition(); }
 }
