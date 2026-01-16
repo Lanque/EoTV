@@ -1,4 +1,4 @@
-package ee.eotv.echoes;
+package ee.eotv.echoes.world;
 
 import com.badlogic.gdx.physics.box2d.*;
 

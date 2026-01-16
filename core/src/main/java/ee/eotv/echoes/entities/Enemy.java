@@ -1,4 +1,4 @@
-package ee.eotv.echoes;
+package ee.eotv.echoes.entities;
 
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
@@ -31,18 +31,22 @@ public class Enemy {
         Vector2 playerPos = player.getPosition();
         float distToPlayer = myPos.dst(playerPos);
 
-        // REEGLID:
-        // 1. Kui mängija taskulamp on sees ja ta on piisavalt lähedal (25m), jälita mängijat
+        // 1. NÄGEMINE: Kui taskulamp on sees
         if (player.isLightOn && distToPlayer < 25f) {
             targetPos.set(playerPos);
         }
 
-        // Liikumine sihtmärgi poole (kui on piisavalt kaugel)
+        // 2. KUULMINE: Kui mängija joobseb ja on lähedal (25 meetrit)
+        if (player.isRunning && player.isMoving && distToPlayer < 25f) {
+            targetPos.set(playerPos);
+        }
+
+        // Liikumine targetPos suunas... (sama mis varem)
         if (myPos.dst(targetPos) > 0.5f) {
             Vector2 dir = new Vector2(targetPos.x - myPos.x, targetPos.y - myPos.y);
             body.setLinearVelocity(dir.nor().scl(speed));
         } else {
-            body.setLinearVelocity(0, 0); // Jõudis kohale / seisab paigal
+            body.setLinearVelocity(0, 0);
         }
     }
 

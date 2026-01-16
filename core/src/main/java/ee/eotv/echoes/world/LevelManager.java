@@ -1,4 +1,4 @@
-package ee.eotv.echoes;
+package ee.eotv.echoes.world;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -7,8 +7,12 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import box2dLight.PointLight;
 import box2dLight.RayHandler;
+import ee.eotv.echoes.entities.Item; // Import
+import ee.eotv.echoes.entities.Player; // Import
+import ee.eotv.echoes.entities.Enemy; // Import
 import java.util.ArrayList;
 import java.util.Iterator;
+import ee.eotv.echoes.entities.Door;
 
 public class LevelManager {
     public World world;
@@ -17,6 +21,9 @@ public class LevelManager {
     private ShapeRenderer shapeRenderer;
     private ArrayList<PointLight> activeEchoes = new ArrayList<>();
 
+    // --- UUS: Esemete nimekiri ---
+    private ArrayList<Item> items = new ArrayList<>();
+    private ArrayList<Door> doors = new ArrayList<>();
     private String[] levelLayout = {
         "########################################",
         "#......................................#",
@@ -31,7 +38,7 @@ public class LevelManager {
         "#..#...#....................#...#......#",
         "#..#...######..........######...#......#",
         "#..#........#..........#........#......#",
-        "#..#........#..........#........#......#",
+        "#..#........#..........#...............#",
         "#..##########..........##########......#",
         "#......................................#",
         "########################################"
@@ -44,14 +51,28 @@ public class LevelManager {
         shapeRenderer = new ShapeRenderer();
 
         rayHandler = new RayHandler(world);
-        rayHandler.setAmbientLight(0f, 0f, 0f, 0f); // Täielik pimedus
+        rayHandler.setAmbientLight(0f, 0f, 0f, 0f); // Pimedus
         rayHandler.setShadows(true);
         rayHandler.setBlurNum(1);
 
         createProceduralLevel();
+
+        // --- UUS: Paneme ühe võtmekaardi testiks kaardile ---
+        spawnItem(Item.Type.KEYCARD, 35, 5);
+
+        // Paneme ukse näiteks koridori ette: x=25, y=5
+        spawnDoor(32, 4);
     }
 
-    // Joonistab hallid seinad ja tumeda põranda
+    // --- UUS: Esemete loomine ja nimekiri ---
+    public void spawnItem(Item.Type type, float x, float y) {
+        items.add(new Item(type, x, y));
+    }
+
+    public ArrayList<Item> getItems() {
+        return items;
+    }
+
     public void drawWorld(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
@@ -74,17 +95,36 @@ public class LevelManager {
         }
         shapeRenderer.end();
     }
+    public void drawDoors(OrthographicCamera camera) {
+        shapeRenderer.setProjectionMatrix(camera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-    // Joonistab mängija (sinine) ja zombi (punane)
+        for (Door door : doors) {
+            door.render(shapeRenderer);
+        }
+
+        shapeRenderer.end();
+    }
+
+    // --- UUS: Joonistame esemed ---
+    public void drawItems(OrthographicCamera camera) {
+        shapeRenderer.setProjectionMatrix(camera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+
+        for (Item item : items) {
+            item.render(shapeRenderer);
+        }
+
+        shapeRenderer.end();
+    }
+
     public void drawCharacters(Player player, Enemy enemy, OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        // Mängija
         shapeRenderer.setColor(Color.CYAN);
         shapeRenderer.circle(player.getPosition().x, player.getPosition().y, 0.4f, 16);
 
-        // Zombi
         if (enemy != null) {
             shapeRenderer.setColor(Color.RED);
             shapeRenderer.circle(enemy.getPosition().x, enemy.getPosition().y, 0.4f, 16);
@@ -116,10 +156,22 @@ public class LevelManager {
         shape.dispose();
     }
 
-    public void addEcho(float x, float y) {
-        PointLight echo = new PointLight(rayHandler, 128, new Color(0.4f, 0.7f, 1f, 1f), 15f, x, y);
+    public void spawnDoor(float x, float y) {
+        doors.add(new Door(world, x, y));
+    }
+
+    public ArrayList<Door> getDoors() {
+        return doors;
+    }
+
+    public void addEcho(float x, float y, float radius, Color color) {
+        PointLight echo = new PointLight(rayHandler, 64, color, radius, x, y);
         echo.setSoft(true);
         activeEchoes.add(echo);
+    }
+
+    public void addEcho(float x, float y) {
+        addEcho(x, y, 15f, new Color(0.4f, 0.7f, 1f, 1f));
     }
 
     public void update(float delta) {

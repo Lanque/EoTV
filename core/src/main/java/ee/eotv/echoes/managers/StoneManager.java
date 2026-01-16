@@ -1,16 +1,19 @@
-package ee.eotv.echoes;
+package ee.eotv.echoes.managers;
 
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Camera;
-import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
+import ee.eotv.echoes.Main; // Et ligi pääseda zombile
+import ee.eotv.echoes.entities.Item; // Import
+import ee.eotv.echoes.entities.Player; // Import
+import ee.eotv.echoes.world.LevelManager; // Import
 import java.util.ArrayList;
 import java.util.Iterator;
-import com.badlogic.gdx.graphics.GL20;
 
 public class StoneManager {
     private class Stone {
@@ -25,7 +28,6 @@ public class StoneManager {
     private ArrayList<Stone> stones = new ArrayList<>();
     private ShapeRenderer shapeRenderer;
 
-    // Viske parameetrid
     public float currentPower = 0f;
     public float maxPower = 1.2f;
     public boolean isCharging = false;
@@ -37,21 +39,21 @@ public class StoneManager {
     }
 
     public void handleInput(Player p, Camera cam) {
-        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT)) {
+        // --- UUS: Kontrollime, kas kive on (ammo > 0) ---
+        if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && p.ammo > 0) {
             isCharging = true;
             currentPower = Math.min(currentPower + 1.5f * Gdx.graphics.getDeltaTime(), maxPower);
         } else if (isCharging) {
             throwStone(p, cam);
+            p.ammo--; // --- UUS: Vähendame moona ---
             currentPower = 0;
             isCharging = false;
         }
     }
 
-    // --- UUS: JOONISTAME TRAJEKTOORI ---
     public void renderTrajectory(Player player, Camera camera) {
         if (!isCharging) return;
 
-        // Lubame läbipaistvuse (blending), et täpid helendaksid
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
@@ -73,7 +75,6 @@ public class StoneManager {
 
             float alpha = 1.0f - ((float)i / dots) * 0.5f;
             shapeRenderer.setColor(0.4f, 0.8f, 1f, alpha);
-
             float size = 0.12f - (i * 0.005f);
             shapeRenderer.circle(dotX, dotY, size, 8);
         }
@@ -82,8 +83,6 @@ public class StoneManager {
         shapeRenderer.circle(startPos.x + dir.x * (distance + 0.7f), startPos.y + dir.y * (distance + 0.7f), 0.15f, 10);
 
         shapeRenderer.end();
-
-        // Lülitame läbipaistvuse välja, et see teisi asju ei mõjutaks
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
@@ -116,6 +115,7 @@ public class StoneManager {
         while (iter.hasNext()) {
             Stone s = iter.next();
             s.timeAlive += delta;
+
             if (s.timeAlive > 0.6f && !s.echoed) {
                 s.body.setLinearDamping(8f);
                 levelManager.addEcho(s.body.getPosition().x, s.body.getPosition().y);
@@ -124,7 +124,11 @@ public class StoneManager {
                 }
                 s.echoed = true;
             }
+
+            // --- UUS: Kivi muutub esemeks (Item) ---
             if (s.timeAlive > 4.0f) {
+                levelManager.spawnItem(Item.Type.STONE, s.body.getPosition().x, s.body.getPosition().y);
+
                 world.destroyBody(s.body);
                 iter.remove();
             }
