@@ -8,10 +8,10 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
-import ee.eotv.echoes.Main; // Et ligi pääseda zombile
-import ee.eotv.echoes.entities.Item; // Import
-import ee.eotv.echoes.entities.Player; // Import
-import ee.eotv.echoes.world.LevelManager; // Import
+import ee.eotv.echoes.Main;
+import ee.eotv.echoes.entities.Item;
+import ee.eotv.echoes.entities.Player;
+import ee.eotv.echoes.world.LevelManager;
 import java.util.ArrayList;
 import java.util.Iterator;
 
@@ -25,6 +25,7 @@ public class StoneManager {
 
     private World world;
     private LevelManager levelManager;
+    private SoundManager soundManager; // UUS MUUTUJA
     private ArrayList<Stone> stones = new ArrayList<>();
     private ShapeRenderer shapeRenderer;
 
@@ -32,20 +33,22 @@ public class StoneManager {
     public float maxPower = 1.2f;
     public boolean isCharging = false;
 
-    public StoneManager(World world, LevelManager lm) {
+    // --- UUS KONSTRUKTOR (3 argumenti) ---
+    public StoneManager(World world, LevelManager lm, SoundManager sm) {
         this.world = world;
         this.levelManager = lm;
+        this.soundManager = sm; // Salvestame viite
         this.shapeRenderer = new ShapeRenderer();
     }
 
     public void handleInput(Player p, Camera cam) {
-        // --- UUS: Kontrollime, kas kive on (ammo > 0) ---
         if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && p.ammo > 0) {
             isCharging = true;
             currentPower = Math.min(currentPower + 1.5f * Gdx.graphics.getDeltaTime(), maxPower);
         } else if (isCharging) {
             throwStone(p, cam);
-            p.ammo--; // --- UUS: Vähendame moona ---
+            if (soundManager != null) soundManager.playThrow(); // HELI
+            p.ammo--;
             currentPower = 0;
             isCharging = false;
         }
@@ -119,16 +122,17 @@ public class StoneManager {
             if (s.timeAlive > 0.6f && !s.echoed) {
                 s.body.setLinearDamping(8f);
                 levelManager.addEcho(s.body.getPosition().x, s.body.getPosition().y);
+
+                if (soundManager != null) soundManager.playHit(); // HELI
+
                 if (Main.zombiInstance != null) {
                     Main.zombiInstance.investigate(s.body.getPosition().x, s.body.getPosition().y);
                 }
                 s.echoed = true;
             }
 
-            // --- UUS: Kivi muutub esemeks (Item) ---
             if (s.timeAlive > 4.0f) {
                 levelManager.spawnItem(Item.Type.STONE, s.body.getPosition().x, s.body.getPosition().y);
-
                 world.destroyBody(s.body);
                 iter.remove();
             }

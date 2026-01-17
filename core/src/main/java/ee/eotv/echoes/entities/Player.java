@@ -10,7 +10,8 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
 import box2dLight.ConeLight;
 import box2dLight.RayHandler;
-import ee.eotv.echoes.world.LevelManager; // Import world paketist
+import ee.eotv.echoes.world.LevelManager;
+import ee.eotv.echoes.managers.SoundManager;
 
 public class Player {
     private Body body;
@@ -27,8 +28,8 @@ public class Player {
     public float stamina = 100f;
     private boolean isExhausted = false;
 
-    // --- INVENTAR (UUS) ---
-    public int ammo = 3; // Alustame 3 kiviga
+    // --- INVENTAR ---
+    public int ammo = 3;
     public boolean hasKeycard = false;
 
     private float stepTimer = 0;
@@ -51,17 +52,17 @@ public class Player {
         flashlight.setSoft(true);
     }
 
-    // --- UUS: ESEMETE KORJAMINE ---
     public void collectItem(Item item) {
         if (item.getType() == Item.Type.STONE) {
-            ammo++; // Saame kivi juurde
+            ammo++;
         } else if (item.getType() == Item.Type.KEYCARD) {
-            hasKeycard = true; // Saime kaardi
+            hasKeycard = true;
         }
     }
 
-    public void update(float delta, LevelManager lm, Camera camera) {
-        handleInput(camera, delta);
+    public void update(float delta, LevelManager lm, Camera camera, SoundManager sm) {
+        // Saadame nüüd SoundManageri edasi ka handleInput meetodisse!
+        handleInput(camera, delta, sm);
 
         isMoving = body.getLinearVelocity().len() > 0.1f;
 
@@ -76,19 +77,31 @@ public class Player {
                     new Color(0.4f, 0.5f, 0.8f, 0.5f);
 
                 lm.addEcho(body.getPosition().x, body.getPosition().y, echoRadius, echoColor);
+
+                if (sm != null) sm.playStep();
+
                 stepTimer = 0;
             }
         }
     }
 
-    private void handleInput(Camera camera, float delta) {
+    // --- UUENDATUD: handleInput võtab nüüd SoundManageri vastu ---
+    private void handleInput(Camera camera, float delta, SoundManager sm) {
         // Taskulamp
         if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.F)) {
             isLightOn = !isLightOn;
             flashlight.setActive(isLightOn);
+
+            // --- UUS: Mängime klõpsu heli ---
+            if (sm != null) {
+                if (isLightOn) {
+                    sm.playLightOn();
+                } else {
+                    sm.playLightOff();
+                }
+            }
         }
 
-        // Jooksmine ja Stamina
         boolean wantsToRun = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
 
         if (isExhausted) {
@@ -111,7 +124,6 @@ public class Player {
             }
         }
 
-        // Liikumine
         float currentSpeed = isRunning ? runSpeed : walkSpeed;
         float vx = 0, vy = 0;
         if (Gdx.input.isKeyPressed(Input.Keys.W)) vy = currentSpeed;
@@ -120,7 +132,6 @@ public class Player {
         if (Gdx.input.isKeyPressed(Input.Keys.D)) vx = currentSpeed;
         body.setLinearVelocity(vx, vy);
 
-        // Pööramine
         Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
         camera.unproject(mouse);
         float angle = MathUtils.atan2(mouse.y - body.getPosition().y, mouse.x - body.getPosition().x);
