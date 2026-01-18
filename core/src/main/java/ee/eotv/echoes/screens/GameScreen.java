@@ -6,11 +6,10 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
-import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.math.Rectangle;
-import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
@@ -40,7 +39,6 @@ public class GameScreen implements Screen {
     private Enemy zombi;
     private StoneManager stoneManager;
     private OrthographicCamera camera;
-    private Box2DDebugRenderer debugRenderer;
     private Hud hud;
     private SoundManager soundManager;
 
@@ -49,11 +47,11 @@ public class GameScreen implements Screen {
     private boolean isVictory = false;
 
     private Stage stage;
-    private Table menuTable;    // Pausi menüü
-    private Table victoryTable; // Võidu menüü
+    private Table menuTable;
+    private Table victoryTable;
     private Skin skin;
 
-    // --- UUS KONSTRUKTOR: boolean loadFromSave ---
+    // --- PARANDUS: Lisasime boolean loadFromSave ---
     public GameScreen(Main game, boolean loadFromSave) {
         this.game = game;
 
@@ -69,16 +67,15 @@ public class GameScreen implements Screen {
         stoneManager = new StoneManager(levelManager.world, levelManager, soundManager);
 
         hud = new Hud();
-        debugRenderer = new Box2DDebugRenderer();
 
         // UI Seadistamine
         stage = new Stage(new ScreenViewport());
         skin = createBasicSkin();
 
-        createPauseMenu();   // Loome pausi menüü (Nimi parandatud)
-        createVictoryMenu(); // Loome võidu menüü
+        createPauseMenu();
+        createVictoryMenu();
 
-        // Kui alustasime menüüst "Load Game" nupuga, laeme kohe andmed
+        // --- KUI ON VAJA LAADIDA, SIIS LAEME ---
         if (loadFromSave && SaveManager.hasSave()) {
             SaveManager.loadGame(player);
         }
@@ -120,7 +117,6 @@ public class GameScreen implements Screen {
         exitBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                // Läheme tagasi peamenüüsse
                 game.setScreen(new MainMenuScreen(game));
             }
         });
@@ -146,7 +142,7 @@ public class GameScreen implements Screen {
         restartBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                // Alustame uut mängu (ei lae salvestust)
+                // Alustame uut mängu (false = ära lae vana seisu)
                 game.setScreen(new GameScreen(game, false));
             }
         });
@@ -208,7 +204,6 @@ public class GameScreen implements Screen {
 
             // Game Over loogika
             if (levelManager.contactListener.isGameOver) {
-                // Taaskäivitusel "false", st alusta algusest
                 game.setScreen(new GameScreen(game, false));
                 return;
             }
@@ -265,10 +260,12 @@ public class GameScreen implements Screen {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
+        // Kasutame lihtsat joonistamist (ilma batchita)
         levelManager.drawWorld(camera);
         levelManager.drawItems(camera);
         levelManager.drawDoors(camera);
         levelManager.drawCharacters(player, zombi, camera);
+
         levelManager.renderLights(camera);
         stoneManager.renderTrajectory(player, camera);
 
@@ -295,7 +292,6 @@ public class GameScreen implements Screen {
     @Override
     public void dispose() {
         levelManager.dispose();
-        debugRenderer.dispose();
         hud.dispose();
         soundManager.dispose();
         stage.dispose();
