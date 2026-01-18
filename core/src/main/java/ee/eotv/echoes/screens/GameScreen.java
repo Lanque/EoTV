@@ -13,7 +13,7 @@ import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
-import com.badlogic.gdx.scenes.scene2d.ui.Label; // UUS IMPORT
+import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Skin;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
@@ -27,7 +27,7 @@ import ee.eotv.echoes.managers.StoneManager;
 import ee.eotv.echoes.world.LevelManager;
 import ee.eotv.echoes.ui.Hud;
 import ee.eotv.echoes.managers.SoundManager;
-import ee.eotv.echoes.managers.SaveManager; // Import, et salvestamine töötaks
+import ee.eotv.echoes.managers.SaveManager;
 
 import java.util.Iterator;
 
@@ -46,14 +46,15 @@ public class GameScreen implements Screen {
 
     // --- MENÜÜD ---
     private boolean isPaused = false;
-    private boolean isVictory = false; // UUS: Kas mäng on võidetud?
+    private boolean isVictory = false;
 
     private Stage stage;
     private Table menuTable;    // Pausi menüü
-    private Table victoryTable; // Võidu menüü (UUS)
+    private Table victoryTable; // Võidu menüü
     private Skin skin;
 
-    public GameScreen(Main game) {
+    // --- UUS KONSTRUKTOR: boolean loadFromSave ---
+    public GameScreen(Main game, boolean loadFromSave) {
         this.game = game;
 
         camera = new OrthographicCamera();
@@ -74,8 +75,13 @@ public class GameScreen implements Screen {
         stage = new Stage(new ScreenViewport());
         skin = createBasicSkin();
 
-        createPauseMenu();   // Loome pausi menüü
+        createPauseMenu();   // Loome pausi menüü (Nimi parandatud)
         createVictoryMenu(); // Loome võidu menüü
+
+        // Kui alustasime menüüst "Load Game" nupuga, laeme kohe andmed
+        if (loadFromSave && SaveManager.hasSave()) {
+            SaveManager.loadGame(player);
+        }
     }
 
     private void createPauseMenu() {
@@ -110,11 +116,12 @@ public class GameScreen implements Screen {
             }
         });
 
-        TextButton exitBtn = new TextButton("EXIT GAME", skin);
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
         exitBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                Gdx.app.exit();
+                // Läheme tagasi peamenüüsse
+                game.setScreen(new MainMenuScreen(game));
             }
         });
 
@@ -126,33 +133,29 @@ public class GameScreen implements Screen {
         stage.addActor(menuTable);
     }
 
-    // --- UUS: VÕIDUMENÜÜ LOOMINE ---
     private void createVictoryMenu() {
         victoryTable = new Table();
         victoryTable.setFillParent(true);
         victoryTable.setVisible(false);
 
-        // Suur kiri "VICTORY!"
         Label.LabelStyle labelStyle = new Label.LabelStyle(skin.getFont("default"), Color.GREEN);
         Label winLabel = new Label("VICTORY!", labelStyle);
-        winLabel.setFontScale(2.0f); // Teeme teksti 2x suuremaks
+        winLabel.setFontScale(2.0f);
 
-        // Nupp "PLAY AGAIN"
         TextButton restartBtn = new TextButton("PLAY AGAIN", skin);
         restartBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                // Taaskäivitame mängu (loome uue GameScreeni)
-                game.setScreen(new GameScreen(game));
+                // Alustame uut mängu (ei lae salvestust)
+                game.setScreen(new GameScreen(game, false));
             }
         });
 
-        // Nupp "EXIT"
-        TextButton exitBtn = new TextButton("EXIT", skin);
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
         exitBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                Gdx.app.exit();
+                game.setScreen(new MainMenuScreen(game));
             }
         });
 
@@ -164,7 +167,7 @@ public class GameScreen implements Screen {
     }
 
     private void togglePause() {
-        if (isVictory) return; // Kui mäng on läbi, ei saa pausi panna
+        if (isVictory) return;
 
         isPaused = !isPaused;
         menuTable.setVisible(isPaused);
@@ -196,17 +199,17 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        // Pausi nupp (ESCAPE) - töötab ainult siis, kui mäng pole veel läbi
-        if (!isVictory && (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE) || Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE))) {
+        // --- Escape menüü ---
+        if (!isVictory && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             togglePause();
         }
 
-        // --- MÄNGU LOOGIKA (Töötab ainult kui pole pausi ega võitu) ---
         if (!isPaused && !isVictory) {
 
-            // Game Over (Zombi sai kätte)
+            // Game Over loogika
             if (levelManager.contactListener.isGameOver) {
-                game.setScreen(new GameScreen(game)); // Restart
+                // Taaskäivitusel "false", st alusta algusest
+                game.setScreen(new GameScreen(game, false));
                 return;
             }
 
@@ -217,7 +220,6 @@ public class GameScreen implements Screen {
             stoneManager.update(delta);
             if (zombi != null) zombi.update(player);
 
-            // Korjamine
             Iterator<Item> itemIter = levelManager.getItems().iterator();
             while (itemIter.hasNext()) {
                 Item item = itemIter.next();
@@ -231,7 +233,6 @@ public class GameScreen implements Screen {
                 }
             }
 
-            // Uksed
             for (ee.eotv.echoes.entities.Door door : levelManager.getDoors()) {
                 if (!door.isOpen()) {
                     if (player.getPosition().dst(door.getCenter()) < 1.5f) {
@@ -243,7 +244,6 @@ public class GameScreen implements Screen {
                 }
             }
 
-            // --- VÕIDU KONTROLL ---
             if (levelManager.getExitZone() != null) {
                 Rectangle playerRect = new Rectangle(
                     player.getPosition().x - 0.2f,
@@ -252,11 +252,9 @@ public class GameScreen implements Screen {
                 );
 
                 if (playerRect.overlaps(levelManager.getExitZone().getBounds())) {
-                    // MÄNG LÄBI - VÕIT!
                     isVictory = true;
-                    victoryTable.setVisible(true); // Näitame võidumenüüd
-                    Gdx.input.setInputProcessor(stage); // Hiir menüüle
-                    System.out.println("VICTORY! ESCAPED!");
+                    victoryTable.setVisible(true);
+                    Gdx.input.setInputProcessor(stage);
                 }
             }
 
@@ -264,7 +262,6 @@ public class GameScreen implements Screen {
             camera.update();
         }
 
-        // --- JOONISTAMINE ---
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
@@ -277,7 +274,6 @@ public class GameScreen implements Screen {
 
         hud.render(player, camera);
 
-        // --- MENÜÜDE JOONISTAMINE (Paus või Võit) ---
         if (isPaused || isVictory) {
             Gdx.gl.glEnable(GL20.GL_BLEND);
             Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
