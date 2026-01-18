@@ -7,12 +7,14 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.physics.box2d.*;
 import box2dLight.PointLight;
 import box2dLight.RayHandler;
-import ee.eotv.echoes.entities.Item; // Import
-import ee.eotv.echoes.entities.Player; // Import
-import ee.eotv.echoes.entities.Enemy; // Import
+import ee.eotv.echoes.entities.Item;
+import ee.eotv.echoes.entities.Player;
+import ee.eotv.echoes.entities.Enemy;
+import ee.eotv.echoes.entities.Door;
+import ee.eotv.echoes.entities.ExitZone; // SEE IMPORT OLI PUUDU
+
 import java.util.ArrayList;
 import java.util.Iterator;
-import ee.eotv.echoes.entities.Door;
 
 public class LevelManager {
     public World world;
@@ -21,9 +23,13 @@ public class LevelManager {
     private ShapeRenderer shapeRenderer;
     private ArrayList<PointLight> activeEchoes = new ArrayList<>();
 
-    // --- UUS: Esemete nimekiri ---
+    // Mänguobjektide nimekirjad
     private ArrayList<Item> items = new ArrayList<>();
     private ArrayList<Door> doors = new ArrayList<>();
+
+    // --- UUS: VÕIDUTSOON ---
+    private ExitZone exitZone;
+
     private String[] levelLayout = {
         "########################################",
         "#......................................#",
@@ -51,20 +57,26 @@ public class LevelManager {
         shapeRenderer = new ShapeRenderer();
 
         rayHandler = new RayHandler(world);
-        rayHandler.setAmbientLight(0f, 0f, 0f, 0f); // Pimedus
+        rayHandler.setAmbientLight(0f, 0f, 0f, 0f);
         rayHandler.setShadows(true);
         rayHandler.setBlurNum(1);
 
         createProceduralLevel();
 
-        // --- UUS: Paneme ühe võtmekaardi testiks kaardile ---
-        spawnItem(Item.Type.KEYCARD, 35, 5);
+        // --- LISAME ASJAD MAAILMA ---
+        spawnItem(Item.Type.KEYCARD, 9, 8); // Võti
+        spawnDoor(32, 4); // Uks
 
-        // Paneme ukse näiteks koridori ette: x=25, y=5
-        spawnDoor(32, 4);
+        // --- LISAME VÕIDUTSOONI ---
+        // Asub ukse taga (x=34, y=4), suurus 2x2 meetrit
+        exitZone = new ExitZone(30, 8, 2, 2);
     }
 
-    // --- UUS: Esemete loomine ja nimekiri ---
+    // --- SEE MEETOD OLI PUUDU ---
+    public ExitZone getExitZone() {
+        return exitZone;
+    }
+
     public void spawnItem(Item.Type type, float x, float y) {
         items.add(new Item(type, x, y));
     }
@@ -73,10 +85,19 @@ public class LevelManager {
         return items;
     }
 
+    public void spawnDoor(float x, float y) {
+        doors.add(new Door(world, x, y));
+    }
+
+    public ArrayList<Door> getDoors() {
+        return doors;
+    }
+
     public void drawWorld(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
+        // 1. Seinad ja põrand
         float tileSize = 1.0f;
         for (int y = 0; y < levelLayout.length; y++) {
             String row = levelLayout[y];
@@ -93,28 +114,30 @@ public class LevelManager {
                 }
             }
         }
-        shapeRenderer.end();
-    }
-    public void drawDoors(OrthographicCamera camera) {
-        shapeRenderer.setProjectionMatrix(camera.combined);
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        for (Door door : doors) {
-            door.render(shapeRenderer);
+        // 2. Joonistame võidutsooni põrandale
+        if (exitZone != null) {
+            exitZone.render(shapeRenderer);
         }
 
         shapeRenderer.end();
     }
 
-    // --- UUS: Joonistame esemed ---
     public void drawItems(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-
         for (Item item : items) {
             item.render(shapeRenderer);
         }
+        shapeRenderer.end();
+    }
 
+    public void drawDoors(OrthographicCamera camera) {
+        shapeRenderer.setProjectionMatrix(camera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        for (Door door : doors) {
+            door.render(shapeRenderer);
+        }
         shapeRenderer.end();
     }
 
@@ -154,14 +177,6 @@ public class LevelManager {
         shape.setAsBox(size / 2, size / 2);
         body.createFixture(shape, 0.0f);
         shape.dispose();
-    }
-
-    public void spawnDoor(float x, float y) {
-        doors.add(new Door(world, x, y));
-    }
-
-    public ArrayList<Door> getDoors() {
-        return doors;
     }
 
     public void addEcho(float x, float y, float radius, Color color) {

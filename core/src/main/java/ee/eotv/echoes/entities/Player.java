@@ -139,4 +139,11 @@ public class Player {
     }
 
     public Vector2 getPosition() { return body.getPosition(); }
+
+    // See meetod tõstab mängija jõuga uude kohta (laadimisel)
+    public void setPosition(float x, float y) {
+        body.setTransform(x, y, body.getAngle());
+    }
 }
+
+
