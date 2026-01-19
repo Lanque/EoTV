@@ -45,13 +45,14 @@ public class GameScreen implements Screen {
     // --- MENÜÜD ---
     private boolean isPaused = false;
     private boolean isVictory = false;
+    private boolean isGameOverState = false; // UUS: Kaotuse olek
 
     private Stage stage;
     private Table menuTable;
     private Table victoryTable;
+    private Table gameOverTable; // UUS: Kaotuse menüü
     private Skin skin;
 
-    // --- PARANDUS: Lisasime boolean loadFromSave ---
     public GameScreen(Main game, boolean loadFromSave) {
         this.game = game;
 
@@ -74,8 +75,8 @@ public class GameScreen implements Screen {
 
         createPauseMenu();
         createVictoryMenu();
+        createGameOverMenu(); // Loome Game Over menüü
 
-        // --- KUI ON VAJA LAADIDA, SIIS LAEME ---
         if (loadFromSave && SaveManager.hasSave()) {
             SaveManager.loadGame(player);
         }
@@ -88,18 +89,12 @@ public class GameScreen implements Screen {
 
         TextButton resumeBtn = new TextButton("RESUME", skin);
         resumeBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                togglePause();
-            }
+            @Override public void clicked(InputEvent event, float x, float y) { togglePause(); }
         });
 
         TextButton saveBtn = new TextButton("SAVE GAME", skin);
         saveBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                SaveManager.saveGame(player);
-            }
+            @Override public void clicked(InputEvent event, float x, float y) { SaveManager.saveGame(player); }
         });
 
         TextButton loadBtn = new TextButton("LOAD GAME", skin);
@@ -115,17 +110,13 @@ public class GameScreen implements Screen {
 
         TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
         exitBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new MainMenuScreen(game));
-            }
+            @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new MainMenuScreen(game)); }
         });
 
         menuTable.add(resumeBtn).width(200).height(50).pad(10).row();
         menuTable.add(saveBtn).width(200).height(50).pad(10).row();
         menuTable.add(loadBtn).width(200).height(50).pad(10).row();
         menuTable.add(exitBtn).width(200).height(50).pad(10);
-
         stage.addActor(menuTable);
     }
 
@@ -140,39 +131,52 @@ public class GameScreen implements Screen {
 
         TextButton restartBtn = new TextButton("PLAY AGAIN", skin);
         restartBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                // Alustame uut mängu (false = ära lae vana seisu)
-                game.setScreen(new GameScreen(game, false));
-            }
+            @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new GameScreen(game, false)); }
         });
 
         TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
         exitBtn.addListener(new ClickListener() {
-            @Override
-            public void clicked(InputEvent event, float x, float y) {
-                game.setScreen(new MainMenuScreen(game));
-            }
+            @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new MainMenuScreen(game)); }
         });
 
         victoryTable.add(winLabel).padBottom(50).row();
         victoryTable.add(restartBtn).width(200).height(50).pad(10).row();
         victoryTable.add(exitBtn).width(200).height(50).pad(10);
-
         stage.addActor(victoryTable);
     }
 
-    private void togglePause() {
-        if (isVictory) return;
+    // --- UUS MEETOD: GAME OVER MENÜÜ ---
+    private void createGameOverMenu() {
+        gameOverTable = new Table();
+        gameOverTable.setFillParent(true);
+        gameOverTable.setVisible(false);
 
+        Label.LabelStyle labelStyle = new Label.LabelStyle(skin.getFont("default"), Color.RED);
+        Label loseLabel = new Label("GAME OVER", labelStyle);
+        loseLabel.setFontScale(2.0f);
+
+        TextButton restartBtn = new TextButton("TRY AGAIN", skin);
+        restartBtn.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new GameScreen(game, false)); }
+        });
+
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
+        exitBtn.addListener(new ClickListener() {
+            @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new MainMenuScreen(game)); }
+        });
+
+        gameOverTable.add(loseLabel).padBottom(50).row();
+        gameOverTable.add(restartBtn).width(200).height(50).pad(10).row();
+        gameOverTable.add(exitBtn).width(200).height(50).pad(10);
+        stage.addActor(gameOverTable);
+    }
+
+    private void togglePause() {
+        if (isVictory || isGameOverState) return;
         isPaused = !isPaused;
         menuTable.setVisible(isPaused);
-
-        if (isPaused) {
-            Gdx.input.setInputProcessor(stage);
-        } else {
-            Gdx.input.setInputProcessor(null);
-        }
+        if (isPaused) Gdx.input.setInputProcessor(stage);
+        else Gdx.input.setInputProcessor(null);
     }
 
     private Skin createBasicSkin() {
@@ -182,74 +186,71 @@ public class GameScreen implements Screen {
         pixmap.fill();
         skin.add("white", new Texture(pixmap));
         skin.add("default", new BitmapFont());
-
         TextButton.TextButtonStyle textButtonStyle = new TextButton.TextButtonStyle();
         textButtonStyle.up = skin.newDrawable("white", 0.3f, 0.3f, 0.3f, 0.9f);
         textButtonStyle.down = skin.newDrawable("white", 0.5f, 0.5f, 0.5f, 0.9f);
         textButtonStyle.over = skin.newDrawable("white", 0.4f, 0.4f, 0.4f, 0.9f);
         textButtonStyle.font = skin.getFont("default");
         skin.add("default", textButtonStyle);
-
         return skin;
     }
 
     @Override
     public void render(float delta) {
-        // --- Escape menüü ---
-        if (!isVictory && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+        // Escape töötab ainult siis, kui mäng pole läbi
+        if (!isVictory && !isGameOverState && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             togglePause();
         }
 
-        if (!isPaused && !isVictory) {
+        if (!isPaused && !isVictory && !isGameOverState) {
 
-            // Game Over loogika
+            // --- GAME OVER KONTROLL ---
             if (levelManager.contactListener.isGameOver) {
-                game.setScreen(new GameScreen(game, false));
-                return;
-            }
+                isGameOverState = true;
+                gameOverTable.setVisible(true);
+                Gdx.input.setInputProcessor(stage);
+            } else {
+                // Mängu loogika
+                player.update(delta, levelManager, camera, soundManager);
+                stoneManager.handleInput(player, camera);
+                levelManager.update(delta);
+                stoneManager.update(delta);
+                if (zombi != null) zombi.update(player);
 
-            player.update(delta, levelManager, camera, soundManager);
-            stoneManager.handleInput(player, camera);
-
-            levelManager.update(delta);
-            stoneManager.update(delta);
-            if (zombi != null) zombi.update(player);
-
-            Iterator<Item> itemIter = levelManager.getItems().iterator();
-            while (itemIter.hasNext()) {
-                Item item = itemIter.next();
-                if (item.isActive()) {
-                    if (player.getPosition().dst(item.getPosition()) < 0.8f) {
-                        player.collectItem(item);
-                        soundManager.playCollect();
-                        item.collect();
-                        itemIter.remove();
-                    }
-                }
-            }
-
-            for (ee.eotv.echoes.entities.Door door : levelManager.getDoors()) {
-                if (!door.isOpen()) {
-                    if (player.getPosition().dst(door.getCenter()) < 1.5f) {
-                        if (player.hasKeycard) {
-                            door.open();
-                            soundManager.playDoor();
+                // ESEMED
+                Iterator<Item> itemIter = levelManager.getItems().iterator();
+                while (itemIter.hasNext()) {
+                    Item item = itemIter.next();
+                    if (item.isActive()) {
+                        if (player.getPosition().dst(item.getPosition()) < 0.8f) {
+                            player.collectItem(item);
+                            soundManager.playCollect();
+                            item.collect();
+                            itemIter.remove();
                         }
                     }
                 }
-            }
 
-            if (levelManager.getExitZone() != null) {
-                Rectangle playerRect = new Rectangle(
-                    player.getPosition().x - 0.2f,
-                    player.getPosition().y - 0.2f,
-                    0.4f, 0.4f
-                );
+                // UKSED
+                for (ee.eotv.echoes.entities.Door door : levelManager.getDoors()) {
+                    if (!door.isOpen()) {
+                        if (player.getPosition().dst(door.getCenter()) < 1.5f) {
+                            if (player.hasKeycard) {
+                                door.open();
+                                soundManager.playDoor();
+                            }
+                        }
+                    }
+                }
 
-                if (playerRect.overlaps(levelManager.getExitZone().getBounds())) {
-                    isVictory = true;
-                    victoryTable.setVisible(true);
-                    Gdx.input.setInputProcessor(stage);
+                // VÕIT
+                if (levelManager.getExitZone() != null) {
+                    Rectangle playerRect = new Rectangle(player.getPosition().x - 0.2f, player.getPosition().y - 0.2f, 0.4f, 0.4f);
+                    if (playerRect.overlaps(levelManager.getExitZone().getBounds())) {
+                        isVictory = true;
+                        victoryTable.setVisible(true);
+                        Gdx.input.setInputProcessor(stage);
+                    }
                 }
             }
 
@@ -260,18 +261,27 @@ public class GameScreen implements Screen {
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-        // Kasutame lihtsat joonistamist (ilma batchita)
+        // --- JOONISTAMINE ---
         levelManager.drawWorld(camera);
         levelManager.drawItems(camera);
         levelManager.drawDoors(camera);
+
+        // Zombi (ShapeRenderer)
         levelManager.drawCharacters(player, zombi, camera);
+
+        // --- MÄNGIJA (SPRITE BATCH) ---
+        game.batch.setProjectionMatrix(camera.combined);
+        game.batch.begin();
+        player.render(game.batch); // Kutsume välja uue meetodi
+        game.batch.end();
 
         levelManager.renderLights(camera);
         stoneManager.renderTrajectory(player, camera);
 
         hud.render(player, camera);
 
-        if (isPaused || isVictory) {
+        // MENÜÜDE JOONISTAMINE
+        if (isPaused || isVictory || isGameOverState) {
             Gdx.gl.glEnable(GL20.GL_BLEND);
             Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
             stage.act(delta);
@@ -279,11 +289,7 @@ public class GameScreen implements Screen {
         }
     }
 
-    @Override
-    public void resize(int width, int height) {
-        stage.getViewport().update(width, height, true);
-    }
-
+    @Override public void resize(int width, int height) { stage.getViewport().update(width, height, true); }
     @Override public void show() {}
     @Override public void pause() {}
     @Override public void resume() {}
@@ -296,5 +302,6 @@ public class GameScreen implements Screen {
         soundManager.dispose();
         stage.dispose();
         skin.dispose();
+        player.dispose(); // Vabastame tekstuuri
     }
 }

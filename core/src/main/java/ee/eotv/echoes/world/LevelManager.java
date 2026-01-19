@@ -11,7 +11,7 @@ import ee.eotv.echoes.entities.Item;
 import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.entities.Enemy;
 import ee.eotv.echoes.entities.Door;
-import ee.eotv.echoes.entities.ExitZone; // SEE IMPORT OLI PUUDU
+import ee.eotv.echoes.entities.ExitZone;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -23,11 +23,8 @@ public class LevelManager {
     private ShapeRenderer shapeRenderer;
     private ArrayList<PointLight> activeEchoes = new ArrayList<>();
 
-    // Mänguobjektide nimekirjad
     private ArrayList<Item> items = new ArrayList<>();
     private ArrayList<Door> doors = new ArrayList<>();
-
-    // --- UUS: VÕIDUTSOON ---
     private ExitZone exitZone;
 
     private String[] levelLayout = {
@@ -63,41 +60,21 @@ public class LevelManager {
 
         createProceduralLevel();
 
-        // --- LISAME ASJAD MAAILMA ---
-        spawnItem(Item.Type.KEYCARD, 9, 8); // Võti
-        spawnDoor(32, 4); // Uks
-
-        // --- LISAME VÕIDUTSOONI ---
-        // Asub ukse taga (x=34, y=4), suurus 2x2 meetrit
+        spawnItem(Item.Type.KEYCARD, 9, 8);
+        spawnDoor(32, 4);
         exitZone = new ExitZone(30, 8, 2, 2);
     }
 
-    // --- SEE MEETOD OLI PUUDU ---
-    public ExitZone getExitZone() {
-        return exitZone;
-    }
-
-    public void spawnItem(Item.Type type, float x, float y) {
-        items.add(new Item(type, x, y));
-    }
-
-    public ArrayList<Item> getItems() {
-        return items;
-    }
-
-    public void spawnDoor(float x, float y) {
-        doors.add(new Door(world, x, y));
-    }
-
-    public ArrayList<Door> getDoors() {
-        return doors;
-    }
+    public ExitZone getExitZone() { return exitZone; }
+    public void spawnItem(Item.Type type, float x, float y) { items.add(new Item(type, x, y)); }
+    public ArrayList<Item> getItems() { return items; }
+    public void spawnDoor(float x, float y) { doors.add(new Door(world, x, y)); }
+    public ArrayList<Door> getDoors() { return doors; }
 
     public void drawWorld(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        // 1. Seinad ja põrand
         float tileSize = 1.0f;
         for (int y = 0; y < levelLayout.length; y++) {
             String row = levelLayout[y];
@@ -114,30 +91,21 @@ public class LevelManager {
                 }
             }
         }
-
-        // 2. Joonistame võidutsooni põrandale
-        if (exitZone != null) {
-            exitZone.render(shapeRenderer);
-        }
-
+        if (exitZone != null) exitZone.render(shapeRenderer);
         shapeRenderer.end();
     }
 
     public void drawItems(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        for (Item item : items) {
-            item.render(shapeRenderer);
-        }
+        for (Item item : items) item.render(shapeRenderer);
         shapeRenderer.end();
     }
 
     public void drawDoors(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        for (Door door : doors) {
-            door.render(shapeRenderer);
-        }
+        for (Door door : doors) door.render(shapeRenderer);
         shapeRenderer.end();
     }
 
@@ -145,9 +113,9 @@ public class LevelManager {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
-        shapeRenderer.setColor(Color.CYAN);
-        shapeRenderer.circle(player.getPosition().x, player.getPosition().y, 0.4f, 16);
+        // Mängija joonistamine (ring) on siit eemaldatud, sest GameScreen joonistab nüüd sprite'i
 
+        // Zombi (punane ring)
         if (enemy != null) {
             shapeRenderer.setColor(Color.RED);
             shapeRenderer.circle(enemy.getPosition().x, enemy.getPosition().y, 0.4f, 16);
@@ -179,13 +147,16 @@ public class LevelManager {
         shape.dispose();
     }
 
+    // --- SEE MEETOD (Põhiline) ---
     public void addEcho(float x, float y, float radius, Color color) {
         PointLight echo = new PointLight(rayHandler, 64, color, radius, x, y);
         echo.setSoft(true);
         activeEchoes.add(echo);
     }
 
+    // --- SEE MEETOD OLI PUUDU (StoneManager vajab seda) ---
     public void addEcho(float x, float y) {
+        // Vaikimisi kaja (nt kivi kukkumisel): raadius 15, sinakas värv
         addEcho(x, y, 15f, new Color(0.4f, 0.7f, 1f, 1f));
     }
 
