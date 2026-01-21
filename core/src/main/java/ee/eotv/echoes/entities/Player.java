@@ -73,9 +73,9 @@ public class Player {
         int frameHeight = 35; // Ühe kaadri kõrgus
 
         // Rüütel on 2. reas. (1. rida on 0-15px, 2. rida algab 16px pealt)
-        int startX = 10;
-        int startY = 70;
-        int padding = 0; // Kui piltide vahel on tühimik, suurenda seda (nt 1)
+        int startX = 9;
+        int startY = 35;
+        int padding = 12; // Kui piltide vahel on tühimik, suurenda seda (nt 1)
 
         TextureRegion[] walkFrames = new TextureRegion[4];
 
