@@ -17,16 +17,23 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import ee.eotv.echoes.Main;
 import ee.eotv.echoes.managers.SaveManager;
+import ee.eotv.echoes.managers.SoundManager; // UUS IMPORT
 
 public class MainMenuScreen implements Screen {
     private final Main game;
     private Stage stage;
     private Skin skin;
+    private SoundManager soundManager; // UUS: Helihaldur
 
     public MainMenuScreen(Main game) {
         this.game = game;
         stage = new Stage(new ScreenViewport());
         Gdx.input.setInputProcessor(stage);
+
+        // Initsialiseerime helid ja paneme muusika käima
+        soundManager = new SoundManager();
+        soundManager.playMenuMusic();
+
         createMenu();
     }
 
@@ -43,6 +50,8 @@ public class MainMenuScreen implements Screen {
         newGameBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // Mängi klikki
+                soundManager.stopMenuMusic(); // Peata muusika enne mängu minekut
                 game.setScreen(new GameScreen(game, false));
             }
         });
@@ -52,6 +61,8 @@ public class MainMenuScreen implements Screen {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 if (SaveManager.hasSave()) {
+                    soundManager.playClick();
+                    soundManager.stopMenuMusic();
                     game.setScreen(new GameScreen(game, true));
                 }
             }
@@ -61,6 +72,8 @@ public class MainMenuScreen implements Screen {
         exitBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick();
+                // Siin võiks panna väikse viivituse (Timer), et heli jõuaks kõlada, aga see on keerulisem
                 Gdx.app.exit();
             }
         });
@@ -102,5 +115,11 @@ public class MainMenuScreen implements Screen {
     @Override public void pause() {}
     @Override public void resume() {}
     @Override public void hide() {}
-    @Override public void dispose() { stage.dispose(); skin.dispose(); }
+
+    @Override
+    public void dispose() {
+        stage.dispose();
+        skin.dispose();
+        soundManager.dispose(); // Ära unusta helisid vabastada!
+    }
 }

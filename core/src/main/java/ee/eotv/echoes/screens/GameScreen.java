@@ -93,27 +93,127 @@ public class GameScreen implements Screen {
 
 
     // SIIN ON VAJALIKUD:
+    // 1. PAUSI MENÜÜ (Esc vajutades)
     private void createPauseMenu() {
-        menuTable = new Table(); menuTable.setFillParent(true); menuTable.setVisible(false);
-        TextButton resumeBtn = new TextButton("RESUME", skin); resumeBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { togglePause(); } });
-        TextButton saveBtn = new TextButton("SAVE GAME", skin); saveBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { SaveManager.saveGame(player); } });
-        TextButton loadBtn = new TextButton("LOAD GAME", skin); loadBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { if (SaveManager.hasSave()) { SaveManager.loadGame(player); togglePause(); } } });
-        TextButton exitBtn = new TextButton("EXIT TO MENU", skin); exitBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new MainMenuScreen(game)); } });
-        menuTable.add(resumeBtn).width(200).height(50).pad(10).row(); menuTable.add(saveBtn).width(200).height(50).pad(10).row(); menuTable.add(loadBtn).width(200).height(50).pad(10).row(); menuTable.add(exitBtn).width(200).height(50).pad(10); stage.addActor(menuTable);
+        menuTable = new Table();
+        menuTable.setFillParent(true);
+        menuTable.setVisible(false);
+
+        // RESUME
+        TextButton resumeBtn = new TextButton("RESUME", skin);
+        resumeBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // <--- HELI
+                togglePause();
+            }
+        });
+
+        // SAVE
+        TextButton saveBtn = new TextButton("SAVE GAME", skin);
+        saveBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // <--- HELI
+                SaveManager.saveGame(player);
+            }
+        });
+
+        // LOAD
+        TextButton loadBtn = new TextButton("LOAD GAME", skin);
+        loadBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (SaveManager.hasSave()) {
+                    soundManager.playClick(); // <--- HELI
+                    SaveManager.loadGame(player);
+                    togglePause();
+                }
+            }
+        });
+
+        // EXIT
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
+        exitBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // <--- HELI
+                soundManager.stopMenuMusic(); // Igaks juhuks peatame, kui peaks käima
+                game.setScreen(new MainMenuScreen(game));
+            }
+        });
+
+        menuTable.add(resumeBtn).width(200).height(50).pad(10).row();
+        menuTable.add(saveBtn).width(200).height(50).pad(10).row();
+        menuTable.add(loadBtn).width(200).height(50).pad(10).row();
+        menuTable.add(exitBtn).width(200).height(50).pad(10);
+        stage.addActor(menuTable);
     }
+
+    // 2. VÕIDU MENÜÜ
     private void createVictoryMenu() {
-        victoryTable = new Table(); victoryTable.setFillParent(true); victoryTable.setVisible(false);
-        Label winLabel = new Label("VICTORY!", new Label.LabelStyle(skin.getFont("default"), Color.GREEN)); winLabel.setFontScale(2.0f);
-        TextButton restartBtn = new TextButton("PLAY AGAIN", skin); restartBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new GameScreen(game, false)); } });
-        TextButton exitBtn = new TextButton("EXIT TO MENU", skin); exitBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new MainMenuScreen(game)); } });
-        victoryTable.add(winLabel).padBottom(50).row(); victoryTable.add(restartBtn).width(200).height(50).pad(10).row(); victoryTable.add(exitBtn).width(200).height(50).pad(10); stage.addActor(victoryTable);
+        victoryTable = new Table();
+        victoryTable.setFillParent(true);
+        victoryTable.setVisible(false);
+
+        Label winLabel = new Label("VICTORY!", new Label.LabelStyle(skin.getFont("default"), Color.GREEN));
+        winLabel.setFontScale(2.0f);
+
+        TextButton restartBtn = new TextButton("PLAY AGAIN", skin);
+        restartBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // <--- HELI
+                game.setScreen(new GameScreen(game, false));
+            }
+        });
+
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
+        exitBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // <--- HELI
+                game.setScreen(new MainMenuScreen(game));
+            }
+        });
+
+        victoryTable.add(winLabel).padBottom(50).row();
+        victoryTable.add(restartBtn).width(200).height(50).pad(10).row();
+        victoryTable.add(exitBtn).width(200).height(50).pad(10);
+        stage.addActor(victoryTable);
     }
+
+    // 3. KAOTUSE MENÜÜ (GAME OVER)
     private void createGameOverMenu() {
-        gameOverTable = new Table(); gameOverTable.setFillParent(true); gameOverTable.setVisible(false);
-        Label loseLabel = new Label("GAME OVER", new Label.LabelStyle(skin.getFont("default"), Color.RED)); loseLabel.setFontScale(2.0f);
-        TextButton restartBtn = new TextButton("TRY AGAIN", skin); restartBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new GameScreen(game, false)); } });
-        TextButton exitBtn = new TextButton("EXIT TO MENU", skin); exitBtn.addListener(new ClickListener() { @Override public void clicked(InputEvent event, float x, float y) { game.setScreen(new MainMenuScreen(game)); } });
-        gameOverTable.add(loseLabel).padBottom(50).row(); gameOverTable.add(restartBtn).width(200).height(50).pad(10).row(); gameOverTable.add(exitBtn).width(200).height(50).pad(10); stage.addActor(gameOverTable);
+        gameOverTable = new Table();
+        gameOverTable.setFillParent(true);
+        gameOverTable.setVisible(false);
+
+        Label loseLabel = new Label("GAME OVER", new Label.LabelStyle(skin.getFont("default"), Color.RED));
+        loseLabel.setFontScale(2.0f);
+
+        TextButton restartBtn = new TextButton("TRY AGAIN", skin);
+        restartBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // <--- HELI
+                game.setScreen(new GameScreen(game, false));
+            }
+        });
+
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
+        exitBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick(); // <--- HELI
+                game.setScreen(new MainMenuScreen(game));
+            }
+        });
+
+        gameOverTable.add(loseLabel).padBottom(50).row();
+        gameOverTable.add(restartBtn).width(200).height(50).pad(10).row();
+        gameOverTable.add(exitBtn).width(200).height(50).pad(10);
+        stage.addActor(gameOverTable);
     }
     private void togglePause() { if (isVictory || isGameOverState) return; isPaused = !isPaused; menuTable.setVisible(isPaused); if (isPaused) Gdx.input.setInputProcessor(stage); else Gdx.input.setInputProcessor(null); }
     private Skin createBasicSkin() { Skin skin = new Skin(); Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888); pixmap.setColor(1, 1, 1, 1); pixmap.fill(); skin.add("white", new Texture(pixmap)); skin.add("default", new BitmapFont()); TextButton.TextButtonStyle s = new TextButton.TextButtonStyle(); s.up = skin.newDrawable("white", 0.3f, 0.3f, 0.3f, 0.9f); s.down = skin.newDrawable("white", 0.5f, 0.5f, 0.5f, 0.9f); s.over = skin.newDrawable("white", 0.4f, 0.4f, 0.4f, 0.9f); s.font = skin.getFont("default"); skin.add("default", s); return skin; }

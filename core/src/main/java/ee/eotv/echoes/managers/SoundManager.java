@@ -1,6 +1,7 @@
 package ee.eotv.echoes.managers;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.audio.Music; // Lisatud Music import
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.utils.Disposable;
@@ -13,9 +14,12 @@ public class SoundManager implements Disposable {
     private Sound doorSound;
     private Sound lightOnSound;
     private Sound lightOffSound;
+    private Sound clickSound; // UUS: Click heli
+
+    private Music menuMusic;  // UUS: Menüü muusika (Music tüüpi)
 
     public SoundManager() {
-        // Üritame laadida helisid. Kui faile pole, püüame vea kinni, et mäng kokku ei jookseks.
+        // Üritame laadida helisid. Kui faile pole, püüame vea kinni.
         try {
             if (Gdx.files.internal("sounds/step.wav").exists())
                 stepSound = Gdx.audio.newSound(Gdx.files.internal("sounds/step.wav"));
@@ -32,6 +36,7 @@ public class SoundManager implements Disposable {
             if (Gdx.files.internal("sounds/door.wav").exists())
                 doorSound = Gdx.audio.newSound(Gdx.files.internal("sounds/door.wav"));
 
+            // --- Valguse helid ---
             if (Gdx.files.internal("sounds/light_on.wav").exists()) {
                 lightOnSound = Gdx.audio.newSound(Gdx.files.internal("sounds/light_on.wav"));
             } else {
@@ -45,8 +50,19 @@ public class SoundManager implements Disposable {
                 System.out.println("VIGA: light_off.wav faili ei leitud assets/sounds kaustast!");
             }
 
+            // --- UUS: Click heli ---
+            if (Gdx.files.internal("sounds/click.wav").exists()) {
+                clickSound = Gdx.audio.newSound(Gdx.files.internal("sounds/click.wav"));
+            }
+
+            // --- UUS: Menüü muusika ---
+            // Muusika laetakse newMusic käsuga
+            if (Gdx.files.internal("sounds/menu_music.wav").exists()) {
+                menuMusic = Gdx.audio.newMusic(Gdx.files.internal("sounds/menu_music.wav"));
+            }
+
         } catch (Exception e) {
-            System.out.println("HOIATUS: Helifailide laadimine ebaõnnestus (failid puudu?).");
+            System.out.println("HOIATUS: Helifailide laadimine ebaõnnestus (failid puudu?). " + e.getMessage());
         }
     }
 
@@ -78,12 +94,31 @@ public class SoundManager implements Disposable {
     }
 
     public void playLightOff() {
-        // DEBUG PRINT
         if (lightOffSound != null) {
             lightOffSound.play(0.5f);
-            System.out.println("DEBUG: Mängin light_off heli.");
-        } else {
-            System.out.println("VIGA: playLightOff kutsuti, aga heli on NULL (faili ei laetud).");
+        }
+    }
+
+    // --- UUS: Click meetod ---
+    public void playClick() {
+        if (clickSound != null) clickSound.play(1.0f);
+    }
+
+    // --- UUS: Menüü muusika meetodid ---
+    public void playMenuMusic() {
+        if (menuMusic != null) {
+            // Kontrollime, et muusika juba ei käiks, et vältida topeltkäivitamist
+            if (!menuMusic.isPlaying()) {
+                menuMusic.setLooping(true); // Paneb kordama
+                menuMusic.setVolume(1f);  // Helitugevus (soovi korral muuda)
+                menuMusic.play();
+            }
+        }
+    }
+
+    public void stopMenuMusic() {
+        if (menuMusic != null && menuMusic.isPlaying()) {
+            menuMusic.stop();
         }
     }
 
@@ -96,5 +131,9 @@ public class SoundManager implements Disposable {
         if (doorSound != null) doorSound.dispose();
         if (lightOnSound != null) lightOnSound.dispose();
         if (lightOffSound != null) lightOffSound.dispose();
+
+        // UUS: Vabastame uued ressursid
+        if (clickSound != null) clickSound.dispose();
+        if (menuMusic != null) menuMusic.dispose();
     }
 }
