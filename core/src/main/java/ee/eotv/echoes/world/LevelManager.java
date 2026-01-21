@@ -23,28 +23,59 @@ public class LevelManager {
     private ShapeRenderer shapeRenderer;
     private ArrayList<PointLight> activeEchoes = new ArrayList<>();
 
+    // Nimekirjad objektidest
     private ArrayList<Item> items = new ArrayList<>();
     private ArrayList<Door> doors = new ArrayList<>();
+    private ArrayList<Enemy> enemies = new ArrayList<>(); // UUS: Nimekiri vaenlastest
     private ExitZone exitZone;
 
+    // --- SUUR KAART (60x30) ---
+    // Saad siin joonistada leveli kasutades sümboleid.
+
+    //  # = Sein
+    //
+    //  . = Põrand (tühi)
+    //
+    //  K = Võtmekaart (Keycard)
+    //
+    //  S = Kivi (Stone)
+    //
+    //  D = Uks (Door)
+    //
+    //  Z = Vaenlane (Zombie)
+    //
+    //  E = Võidutsoon (Exit)
     private String[] levelLayout = {
-        "########################################",
-        "#......................................#",
-        "#..##########..........##########......#",
-        "#..#........#..........#........#......#",
-        "#..#........#..........#........#......#",
-        "#..#...######..........######...#......#",
-        "#..#...#....................#...#......#",
-        "#..#...#.......######.......#...#......#",
-        "#..#...#............#.......#...#......#",
-        "#..#...#.......######.......#...#......#",
-        "#..#...#....................#...#......#",
-        "#..#...######..........######...#......#",
-        "#..#........#..........#........#......#",
-        "#..#........#..........#...............#",
-        "#..##########..........##########......#",
-        "#......................................#",
-        "########################################"
+        "############################################################",
+        "#..........................................................#",
+        "#..#######...###########...#################...##########..#",
+        "#..#.....#...#.........#...#.......#.......#...#........#..#",
+        "#..#..S..#...#....Z....#...#...K...#...Z...#...#........#..#",
+        "#..#.....#...#.........#...#.......#.......#...#........#..#",
+        "#..###.###...#####.#####...###.#####...#####...###.######..#",
+        "#..........................................................#",
+        "#######.####...###########.......###########################",
+        "#..........#...#.........#.......#.........................#",
+        "#..........#...#.................#.........................#",
+        "#...########...#....Z....#.......#........##.#######.......#",
+        "#...#......#...#.........#.......#.................#.......#",
+        "#...#..S...#...###########.......#........#...Z....#.......#",
+        "#...#......#.....................D........#........#.......#",
+        "#...##.#####...###########.......#........##########.......#",
+        "#..............#.........#.......#.........................#",
+        "################.........#.......###########################",
+        "#........................#.......#.........................#",
+        "#..###########...#########.......#.........................#",
+        "#..#.........#...#.......#.......#.......###########.......#",
+        "#..#....Z....#...#...S...........#.......#.........#.......#",
+        "#..#.........#...#.......#.......#.......#....E....#.......#",
+        "#..#####.#####...#########.......#.......#.........#.......#",
+        "#........................................#.........#.......#",
+        "##########################################.........#.......#",
+        "#..................................................#.......#",
+        "#..#################################################.......#",
+        "#..........................................................#",
+        "############################################################"
     };
 
     public LevelManager() {
@@ -58,18 +89,62 @@ public class LevelManager {
         rayHandler.setShadows(true);
         rayHandler.setBlurNum(1);
 
-        createProceduralLevel();
+        // Parsime kaardi ja loome maailma
+        createLevelFromMap();
+    }
 
-        spawnItem(Item.Type.KEYCARD, 9, 8);
-        spawnDoor(32, 4);
-        exitZone = new ExitZone(30, 8, 2, 2);
+    // --- PARSIMISE LOOGIKA ---
+    private void createLevelFromMap() {
+        float tileSize = 1.0f;
+
+        // Pöörame y-telje ümber, et stringi ülemine rida oleks maailma ülemine osa
+        for (int y = 0; y < levelLayout.length; y++) {
+            String row = levelLayout[y];
+            for (int x = 0; x < row.length(); x++) {
+                // Arvutame maailma koordinaadid
+                float worldX = x * tileSize;
+                float worldY = (levelLayout.length - 1 - y) * tileSize;
+
+                char symbol = row.charAt(x);
+
+                switch (symbol) {
+                    case '#': // Sein
+                        createWall(worldX, worldY, tileSize);
+                        break;
+                    case 'K': // Keycard
+                        spawnItem(Item.Type.KEYCARD, worldX + 0.5f, worldY + 0.5f);
+                        break;
+                    case 'S': // Stone
+                        spawnItem(Item.Type.STONE, worldX + 0.5f, worldY + 0.5f);
+                        break;
+                    case 'D': // Door
+                        spawnDoor(worldX, worldY); // Uks on 1x1 plokk
+                        break;
+                    case 'Z': // Zombie
+                        spawnEnemy(worldX + 0.5f, worldY + 0.5f);
+                        break;
+                    case 'E': // Exit Zone
+                        exitZone = new ExitZone(worldX, worldY, 2, 2);
+                        break;
+                    default:
+                        // '.' on põrand (tühi), midagi ei tee
+                        break;
+                }
+            }
+        }
     }
 
     public ExitZone getExitZone() { return exitZone; }
+
     public void spawnItem(Item.Type type, float x, float y) { items.add(new Item(type, x, y)); }
     public ArrayList<Item> getItems() { return items; }
+
     public void spawnDoor(float x, float y) { doors.add(new Door(world, x, y)); }
     public ArrayList<Door> getDoors() { return doors; }
+
+    // UUS: Vaenlaste lisamine ja küsimine
+    public void spawnEnemy(float x, float y) { enemies.add(new Enemy(world, x, y)); }
+    public ArrayList<Enemy> getEnemies() { return enemies; }
 
     public void drawWorld(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
@@ -80,12 +155,13 @@ public class LevelManager {
             String row = levelLayout[y];
             for (int x = 0; x < row.length(); x++) {
                 float worldX = x * tileSize;
-                float worldY = (levelLayout.length - y) * tileSize;
+                float worldY = (levelLayout.length - 1 - y) * tileSize;
 
                 if (row.charAt(x) == '#') {
                     shapeRenderer.setColor(0.3f, 0.3f, 0.3f, 1f);
                     shapeRenderer.rect(worldX, worldY, tileSize, tileSize);
                 } else {
+                    // Põranda värv
                     shapeRenderer.setColor(0.05f, 0.05f, 0.05f, 1f);
                     shapeRenderer.rect(worldX, worldY, tileSize, tileSize);
                 }
@@ -109,31 +185,17 @@ public class LevelManager {
         shapeRenderer.end();
     }
 
-    public void drawCharacters(Player player, Enemy enemy, OrthographicCamera camera) {
+    // UUS: Joonistab nüüd kõiki vaenlasi nimekirjast
+    public void drawEnemies(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(Color.RED);
 
-        // Mängija joonistamine (ring) on siit eemaldatud, sest GameScreen joonistab nüüd sprite'i
-
-        // Zombi (punane ring)
-        if (enemy != null) {
-            shapeRenderer.setColor(Color.RED);
+        for (Enemy enemy : enemies) {
             shapeRenderer.circle(enemy.getPosition().x, enemy.getPosition().y, 0.4f, 16);
         }
 
         shapeRenderer.end();
-    }
-
-    private void createProceduralLevel() {
-        float tileSize = 1.0f;
-        for (int y = 0; y < levelLayout.length; y++) {
-            String row = levelLayout[y];
-            for (int x = 0; x < row.length(); x++) {
-                if (row.charAt(x) == '#') {
-                    createWall(x * tileSize, (levelLayout.length - y) * tileSize, tileSize);
-                }
-            }
-        }
     }
 
     private void createWall(float x, float y, float size) {
@@ -147,16 +209,13 @@ public class LevelManager {
         shape.dispose();
     }
 
-    // --- SEE MEETOD (Põhiline) ---
     public void addEcho(float x, float y, float radius, Color color) {
         PointLight echo = new PointLight(rayHandler, 64, color, radius, x, y);
         echo.setSoft(true);
         activeEchoes.add(echo);
     }
 
-    // --- SEE MEETOD OLI PUUDU (StoneManager vajab seda) ---
     public void addEcho(float x, float y) {
-        // Vaikimisi kaja (nt kivi kukkumisel): raadius 15, sinakas värv
         addEcho(x, y, 15f, new Color(0.4f, 0.7f, 1f, 1f));
     }
 
