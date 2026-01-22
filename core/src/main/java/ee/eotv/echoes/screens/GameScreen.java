@@ -289,14 +289,19 @@ public class GameScreen implements Screen {
         levelManager.drawItems(camera);
         levelManager.drawDoors(camera);
 
-        // --- UUS: JOONISTAME KÕIK VAENLASED ---
-        levelManager.drawEnemies(camera);
-
         game.batch.setProjectionMatrix(camera.combined);
         game.batch.begin();
-        player.render(game.batch);
-        game.batch.end();
 
+// 1. Joonistame MÄNGIJA
+        player.render(game.batch);
+
+// 2. Joonistame VAENLASED (UUS KOOD)
+// Käime läbi kõik LevelManageris olevad vaenlased ja renderdame nende tekstuurid
+        for (ee.eotv.echoes.entities.Enemy enemy : levelManager.getEnemies()) {
+            enemy.render(game.batch);
+        }
+
+        game.batch.end();
         levelManager.renderLights(camera);
         stoneManager.renderTrajectory(player, camera);
 
@@ -324,5 +329,10 @@ public class GameScreen implements Screen {
         stage.dispose();
         skin.dispose();
         player.dispose();
+
+        // UUS: Vabastame vaenlaste tekstuurid
+        for (ee.eotv.echoes.entities.Enemy enemy : levelManager.getEnemies()) {
+            enemy.dispose();
+        }
     }
 }
