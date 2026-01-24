@@ -19,13 +19,13 @@ public class StoneManager {
     private class Stone {
         Body body;
         float timeAlive = 0;
-        boolean echoed = false;
+        // boolean echoed = false; // Seda pole enam vaja, sest kivi kaob kohe
         public Stone(Body b) { this.body = b; }
     }
 
     private World world;
     private LevelManager levelManager;
-    private SoundManager soundManager; // UUS MUUTUJA
+    private SoundManager soundManager;
     private ArrayList<Stone> stones = new ArrayList<>();
     private ShapeRenderer shapeRenderer;
 
@@ -33,11 +33,10 @@ public class StoneManager {
     public float maxPower = 1.2f;
     public boolean isCharging = false;
 
-    // --- UUS KONSTRUKTOR (3 argumenti) ---
     public StoneManager(World world, LevelManager lm, SoundManager sm) {
         this.world = world;
         this.levelManager = lm;
-        this.soundManager = sm; // Salvestame viite
+        this.soundManager = sm;
         this.shapeRenderer = new ShapeRenderer();
     }
 
@@ -47,7 +46,7 @@ public class StoneManager {
             currentPower = Math.min(currentPower + 1.5f * Gdx.graphics.getDeltaTime(), maxPower);
         } else if (isCharging) {
             throwStone(p, cam);
-            if (soundManager != null) soundManager.playThrow(); // HELI
+            if (soundManager != null) soundManager.playThrow();
             p.ammo--;
             currentPower = 0;
             isCharging = false;
@@ -119,20 +118,21 @@ public class StoneManager {
             Stone s = iter.next();
             s.timeAlive += delta;
 
-            if (s.timeAlive > 0.6f && !s.echoed) {
-                s.body.setLinearDamping(8f);
+            // Kui kivi on lennanud 0.6 sekundit (maandub)
+            if (s.timeAlive > 0.6f) {
+                // 1. Tee Echo (Heli + Valgus + Zombi tähelepanu)
                 levelManager.addEcho(s.body.getPosition().x, s.body.getPosition().y);
-
-                if (soundManager != null) soundManager.playHit(); // HELI
+                if (soundManager != null) soundManager.playHit();
 
                 if (Main.zombiInstance != null) {
                     Main.zombiInstance.investigate(s.body.getPosition().x, s.body.getPosition().y);
                 }
-                s.echoed = true;
-            }
 
-            if (s.timeAlive > 4.0f) {
+                // 2. MUUDA KOHE KORJATAVAKS ESEMEKS
+                // Tekitame Item.Type.STONE täpselt sinna, kus kivi on
                 levelManager.spawnItem(Item.Type.STONE, s.body.getPosition().x, s.body.getPosition().y);
+
+                // 3. Kustutame lendava kivi füüsikakeha ja eemaldame nimekirjast
                 world.destroyBody(s.body);
                 iter.remove();
             }
