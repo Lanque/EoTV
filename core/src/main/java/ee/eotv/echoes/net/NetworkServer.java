@@ -108,6 +108,7 @@ public class NetworkServer {
         copy.right = input.right;
         copy.run = input.run;
         copy.toggleLight = input.toggleLight;
+        copy.revive = input.revive;
         copy.aimAngle = input.aimAngle;
         return copy;
     }

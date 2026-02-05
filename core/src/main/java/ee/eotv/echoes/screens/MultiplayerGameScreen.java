@@ -6,10 +6,20 @@ import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.Stage;
+import com.badlogic.gdx.scenes.scene2d.ui.Skin;
+import com.badlogic.gdx.scenes.scene2d.ui.Table;
+import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
+import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import ee.eotv.echoes.Main;
 import ee.eotv.echoes.entities.Door;
 import ee.eotv.echoes.entities.Enemy;
@@ -46,6 +56,20 @@ public class MultiplayerGameScreen implements Screen {
     private Hud hud;
     private OrthographicCamera camera;
     private ShapeRenderer trajectoryRenderer;
+    private ShapeRenderer overlayRenderer;
+
+    private Stage stage;
+    private Skin skin;
+    private Table pauseTable;
+    private Table gameOverTable;
+    private boolean isPaused = false;
+    private BitmapFont overlayFont;
+
+    private float reviveTimeRequired = 2.5f;
+    private float reviveRange = 1.8f;
+    private float reviveTimerForHost = 0f;
+    private float reviveTimerForClient = 0f;
+    private float reviveDisplayTimer = 0f;
 
     private float currentPower = 0f;
     private float maxPower = 1.2f;
@@ -81,6 +105,11 @@ public class MultiplayerGameScreen implements Screen {
         soundManager = new SoundManager();
         hud = new Hud();
         trajectoryRenderer = new ShapeRenderer();
+        overlayRenderer = new ShapeRenderer();
+        stage = new Stage(new ScreenViewport());
+        skin = createBasicSkin();
+        createPauseMenu();
+        overlayFont = new BitmapFont();
 
         Vector2 hostStart = new Vector2(2, 25);
         Vector2 clientStart = new Vector2(4, 25);
@@ -128,6 +157,7 @@ public class MultiplayerGameScreen implements Screen {
                 @Override
                 public void onStep(Player player) {
                     sendSoundEvent(NetMessages.SoundType.STEP, player.getPosition().x, player.getPosition().y, true);
+                    sendEchoForStep(player);
                 }
 
                 @Override
@@ -143,12 +173,34 @@ public class MultiplayerGameScreen implements Screen {
 
     @Override
     public void render(float delta) {
+        if (isGameOver) {
+            drawScene(delta);
+            renderGameOverMenu(delta);
+            return;
+        }
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            togglePause();
+        }
+
+        if (isPaused) {
+            drawScene(delta);
+            renderPauseMenu(delta);
+            return;
+        }
+
+        Gdx.input.setInputProcessor(null);
+
         if (isHost) {
             updateHost(delta);
         } else {
             updateClient(delta);
         }
 
+        drawScene(delta);
+    }
+
+    private void drawScene(float delta) {
         camera.position.set(localPlayer.getPosition(), 0);
         camera.update();
 
@@ -175,6 +227,10 @@ public class MultiplayerGameScreen implements Screen {
             renderTrajectory();
         }
         hud.render(localPlayer, camera);
+        if (localPlayer.isDowned()) {
+            renderDownedOverlay();
+        }
+        renderRevivePrompt();
     }
 
     private void updateHost(float delta) {
@@ -205,10 +261,12 @@ public class MultiplayerGameScreen implements Screen {
                 enemy.update(closest, delta);
             }
 
+            handleDownedState(delta, remoteInput);
             updateItemsAndDoors();
             updateVictoryAndGameOver();
         }
 
+        updateReviveDisplayTimer(delta, Gdx.input.isKeyPressed(Input.Keys.E));
         sendWorldState();
     }
 
@@ -222,6 +280,7 @@ public class MultiplayerGameScreen implements Screen {
         levelManager.updateClient(delta);
         handleEchoEvents();
         handleSoundEvents();
+        updateReviveDisplayTimer(delta, Gdx.input.isKeyPressed(Input.Keys.E));
     }
 
     private void updateItemsAndDoors() {
@@ -230,15 +289,19 @@ public class MultiplayerGameScreen implements Screen {
             Item item = itemIter.next();
             if (item.isActive()) {
                 if (localPlayer.getPosition().dst(item.getPosition()) < 0.8f) {
-                    localPlayer.collectItem(item);
-                    sendSoundEvent(NetMessages.SoundType.COLLECT, localPlayer.getPosition().x, localPlayer.getPosition().y, true);
-                    item.collect();
-                    itemIter.remove();
+                    if (item.getType() != Item.Type.STONE || localPlayer.canThrowStones()) {
+                        localPlayer.collectItem(item);
+                        sendSoundEvent(NetMessages.SoundType.COLLECT, localPlayer.getPosition().x, localPlayer.getPosition().y, true);
+                        item.collect();
+                        itemIter.remove();
+                    }
                 } else if (remotePlayer.getPosition().dst(item.getPosition()) < 0.8f) {
-                    remotePlayer.collectItem(item);
-                    sendSoundEvent(NetMessages.SoundType.COLLECT, remotePlayer.getPosition().x, remotePlayer.getPosition().y, true);
-                    item.collect();
-                    itemIter.remove();
+                    if (item.getType() != Item.Type.STONE || remotePlayer.canThrowStones()) {
+                        remotePlayer.collectItem(item);
+                        sendSoundEvent(NetMessages.SoundType.COLLECT, remotePlayer.getPosition().x, remotePlayer.getPosition().y, true);
+                        item.collect();
+                        itemIter.remove();
+                    }
                 }
             }
         }
@@ -258,7 +321,7 @@ public class MultiplayerGameScreen implements Screen {
     }
 
     private void updateVictoryAndGameOver() {
-        if (levelManager.contactListener.isGameOver) {
+        if (localPlayer.isDowned() && remotePlayer.isDowned()) {
             isGameOver = true;
         }
 
@@ -328,6 +391,7 @@ public class MultiplayerGameScreen implements Screen {
         input.right = Gdx.input.isKeyPressed(Input.Keys.D);
         input.run = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
         input.toggleLight = Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.F);
+        input.revive = Gdx.input.isKeyPressed(Input.Keys.E);
 
         Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
         camera.unproject(mouse);
@@ -360,7 +424,7 @@ public class MultiplayerGameScreen implements Screen {
             if (ps == null) continue;
             Player target = ps.id == localPlayerId ? localPlayer : remotePlayer;
             target.setNetworkState(ps.x, ps.y, ps.vx, ps.vy, ps.lightOn, ps.running, ps.moving,
-                ps.stamina, ps.ammo, ps.hasKeycard, ps.aimAngle, ps.role);
+                ps.stamina, ps.ammo, ps.hasKeycard, ps.aimAngle, ps.role, ps.downed);
         }
 
         for (NetMessages.EnemyState es : state.enemies) {
@@ -419,6 +483,7 @@ public class MultiplayerGameScreen implements Screen {
         ps.hasKeycard = player.hasKeycard;
         ps.aimAngle = player.getAimAngle();
         ps.role = player.getRole();
+        ps.downed = player.isDowned();
         return ps;
     }
 
@@ -478,6 +543,225 @@ public class MultiplayerGameScreen implements Screen {
 
         trajectoryRenderer.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void handleDownedState(float delta, NetMessages.InputState remoteInput) {
+        for (Enemy enemy : levelManager.getEnemies()) {
+            if (!localPlayer.isDowned() && enemy.getPosition().dst(localPlayer.getPosition()) < 0.85f) {
+                localPlayer.setDowned(true);
+                enemy.forceReturnToPatrol();
+            }
+            if (!remotePlayer.isDowned() && enemy.getPosition().dst(remotePlayer.getPosition()) < 0.85f) {
+                remotePlayer.setDowned(true);
+                enemy.forceReturnToPatrol();
+            }
+        }
+
+        boolean localRevive = Gdx.input.isKeyPressed(Input.Keys.E);
+        boolean remoteRevive = remoteInput != null && remoteInput.revive;
+
+        reviveTimerForHost = updateReviveTimer(localPlayer, remotePlayer, remoteRevive, reviveTimerForHost, delta);
+        reviveTimerForClient = updateReviveTimer(remotePlayer, localPlayer, localRevive, reviveTimerForClient, delta);
+    }
+
+    private float updateReviveTimer(Player target, Player helper, boolean isReviving, float timer, float delta) {
+        if (target.isDowned() && !helper.isDowned() && helper.getPosition().dst(target.getPosition()) <= reviveRange && isReviving) {
+            timer += delta;
+            if (timer >= reviveTimeRequired) {
+                target.setDowned(false);
+                timer = 0f;
+            }
+        } else {
+            timer = 0f;
+        }
+        return timer;
+    }
+
+    private void renderDownedOverlay() {
+        float viewWidth = camera.viewportWidth * camera.zoom;
+        float viewHeight = camera.viewportHeight * camera.zoom;
+        float startX = camera.position.x - viewWidth / 2f;
+        float startY = camera.position.y - viewHeight / 2f;
+
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        overlayRenderer.setProjectionMatrix(camera.combined);
+        overlayRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        overlayRenderer.setColor(0.6f, 0.0f, 0.0f, 0.35f);
+        overlayRenderer.rect(startX, startY, viewWidth, viewHeight);
+        overlayRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void renderRevivePrompt() {
+        boolean canRevive = !localPlayer.isDowned()
+            && remotePlayer.isDowned()
+            && localPlayer.getPosition().dst(remotePlayer.getPosition()) <= reviveRange;
+
+        if (!canRevive) return;
+
+        String text = "Hold E to revive";
+        float textX = stage.getViewport().getWorldWidth() * 0.5f - 70f;
+        float textY = 40f;
+
+        overlayFont.getData().setScale(1.0f);
+        game.batch.setProjectionMatrix(stage.getCamera().combined);
+        game.batch.begin();
+        overlayFont.setColor(1f, 1f, 1f, 1f);
+        overlayFont.draw(game.batch, text, textX, textY);
+        game.batch.end();
+
+        float progress = Math.min(reviveDisplayTimer / reviveTimeRequired, 1f);
+        float barWidth = 140f;
+        float barHeight = 6f;
+        float barX = stage.getViewport().getWorldWidth() * 0.5f - barWidth * 0.5f;
+        float barY = 22f;
+
+        overlayRenderer.setProjectionMatrix(stage.getCamera().combined);
+        overlayRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        overlayRenderer.setColor(0.2f, 0.2f, 0.2f, 0.8f);
+        overlayRenderer.rect(barX, barY, barWidth, barHeight);
+        overlayRenderer.setColor(0.8f, 0.2f, 0.2f, 0.9f);
+        overlayRenderer.rect(barX, barY, barWidth * progress, barHeight);
+        overlayRenderer.end();
+    }
+
+    private void togglePause() {
+        isPaused = !isPaused;
+        if (isPaused) {
+            Gdx.input.setInputProcessor(stage);
+        } else {
+            Gdx.input.setInputProcessor(null);
+        }
+    }
+
+    private void renderPauseMenu(float delta) {
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        pauseTable.setVisible(true);
+        gameOverTable.setVisible(false);
+        stage.act(delta);
+        stage.draw();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void createPauseMenu() {
+        pauseTable = new Table();
+        pauseTable.setFillParent(true);
+
+        TextButton resumeBtn = new TextButton("RESUME", skin);
+        resumeBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                togglePause();
+            }
+        });
+
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
+        exitBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (server != null) server.stop();
+                if (client != null) client.stop();
+                game.setScreen(new MainMenuScreen(game));
+            }
+        });
+
+        pauseTable.add(resumeBtn).width(200).height(50).pad(10).row();
+        pauseTable.add(exitBtn).width(200).height(50).pad(10);
+        stage.addActor(pauseTable);
+
+        gameOverTable = new Table();
+        gameOverTable.setFillParent(true);
+
+        TextButton restartBtn = new TextButton("RESTART", skin);
+        restartBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (server != null) server.stop();
+                if (client != null) client.stop();
+                game.setScreen(new MultiplayerMenuScreen(game));
+            }
+        });
+
+        TextButton gameOverExitBtn = new TextButton("EXIT TO MENU", skin);
+        gameOverExitBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (server != null) server.stop();
+                if (client != null) client.stop();
+                game.setScreen(new MainMenuScreen(game));
+            }
+        });
+
+        com.badlogic.gdx.scenes.scene2d.ui.Label gameOverLabel =
+            new com.badlogic.gdx.scenes.scene2d.ui.Label("GAME OVER", skin);
+
+        gameOverTable.add(gameOverLabel).padBottom(30).row();
+        gameOverTable.add(restartBtn).width(200).height(50).pad(10).row();
+        gameOverTable.add(gameOverExitBtn).width(200).height(50).pad(10);
+        gameOverTable.setVisible(false);
+        stage.addActor(gameOverTable);
+    }
+
+    private void renderGameOverMenu(float delta) {
+        gameOverTable.setVisible(true);
+        pauseTable.setVisible(false);
+        Gdx.input.setInputProcessor(stage);
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        stage.act(delta);
+        stage.draw();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private Skin createBasicSkin() {
+        Skin skin = new Skin();
+        Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+        pixmap.setColor(1, 1, 1, 1);
+        pixmap.fill();
+        skin.add("white", new Texture(pixmap));
+        skin.add("default", new BitmapFont());
+
+        skin.add("default", new com.badlogic.gdx.scenes.scene2d.ui.Label.LabelStyle(skin.getFont("default"), Color.WHITE));
+
+        TextButton.TextButtonStyle style = new TextButton.TextButtonStyle();
+        style.up = skin.newDrawable("white", 0.2f, 0.2f, 0.2f, 0.9f);
+        style.down = skin.newDrawable("white", 0.4f, 0.4f, 0.4f, 0.9f);
+        style.over = skin.newDrawable("white", 0.3f, 0.3f, 0.3f, 0.9f);
+        style.font = skin.getFont("default");
+        skin.add("default", style);
+        return skin;
+    }
+
+    private void updateReviveDisplayTimer(float delta, boolean isHoldingRevive) {
+        boolean canRevive = !localPlayer.isDowned()
+            && remotePlayer.isDowned()
+            && localPlayer.getPosition().dst(remotePlayer.getPosition()) <= reviveRange;
+        if (canRevive && isHoldingRevive) {
+            reviveDisplayTimer = Math.min(reviveDisplayTimer + delta, reviveTimeRequired);
+        } else {
+            reviveDisplayTimer = 0f;
+        }
+    }
+
+    private void sendEchoForStep(Player player) {
+        float radius = player.isRunning ? 32f : 18f;
+        Color color = player.isRunning
+            ? new Color(0.5f, 0.7f, 1f, 0.5f)
+            : new Color(0.4f, 0.5f, 0.8f, 0.5f);
+
+        NetMessages.EchoEvent event = new NetMessages.EchoEvent();
+        event.x = player.getPosition().x;
+        event.y = player.getPosition().y;
+        event.radius = radius;
+        event.r = color.r;
+        event.g = color.g;
+        event.b = color.b;
+        event.a = color.a;
+        if (server != null) {
+            server.sendEcho(event);
+        }
     }
 
     private void sendSoundEvent(NetMessages.SoundType type, float x, float y, boolean playLocal) {
@@ -544,7 +828,12 @@ public class MultiplayerGameScreen implements Screen {
         }
     }
 
-    @Override public void resize(int width, int height) { }
+    @Override
+    public void resize(int width, int height) {
+        if (stage != null) {
+            stage.getViewport().update(width, height, true);
+        }
+    }
     @Override public void show() { }
     @Override public void pause() { }
     @Override public void resume() { }
@@ -553,11 +842,15 @@ public class MultiplayerGameScreen implements Screen {
     @Override
     public void dispose() {
         if (trajectoryRenderer != null) trajectoryRenderer.dispose();
+        if (overlayRenderer != null) overlayRenderer.dispose();
         levelManager.dispose();
         hud.dispose();
         soundManager.dispose();
         localPlayer.dispose();
         remotePlayer.dispose();
+        if (stage != null) stage.dispose();
+        if (skin != null) skin.dispose();
+        if (overlayFont != null) overlayFont.dispose();
         if (server != null) server.stop();
         if (client != null) client.stop();
     }

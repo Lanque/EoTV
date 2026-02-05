@@ -163,6 +163,16 @@ public class Enemy {
         if (texture != null) texture.dispose();
     }
 
+    public void forceReturnToPatrol() {
+        state = State.PATROL;
+        patrolWaitTimer = 0f;
+        if (patrolPoints.size > 0) {
+            targetPos.set(patrolPoints.get(patrolIndex));
+        } else {
+            targetPos.set(spawnPos);
+        }
+    }
+
     public void setNetworkState(float x, float y, float vx, float vy, boolean facingRightValue) {
         body.setTransform(x, y, body.getAngle());
         body.setLinearVelocity(vx, vy);

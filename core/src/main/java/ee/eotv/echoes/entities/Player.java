@@ -57,6 +57,7 @@ public class Player {
     private TextureRegion idleFrame;
     private float stateTime;
     private boolean facingRight = true;
+    private boolean isDowned = false;
 
     // Hoiame nurka meeles, et uuendada valgust render tsüklis
     private float currentAngle = 0f;
@@ -191,7 +192,7 @@ public class Player {
     private void applyInput(PlayerInput input, float delta, SoundManager sm) {
         if (input == null) return;
 
-        if (input.toggleLight && canUseFlashlight()) {
+        if (input.toggleLight && canUseFlashlight() && !isDowned) {
             isLightOn = !isLightOn;
             flashlight.setActive(isLightOn);
             if (actionListener != null) {
@@ -201,7 +202,7 @@ public class Player {
             }
         }
 
-        boolean wantsToRun = input.wantsToRun;
+        boolean wantsToRun = input.wantsToRun && !isDowned;
 
         if (isExhausted) {
             if (stamina > 25f) isExhausted = false;
@@ -223,7 +224,7 @@ public class Player {
             }
         }
 
-        float currentSpeed = isRunning ? runSpeed : walkSpeed;
+        float currentSpeed = (isRunning ? runSpeed : walkSpeed) * (isDowned ? 0.25f : 1f);
         float vx = 0, vy = 0;
         if (input.up) vy = currentSpeed;
         if (input.down) vy = -currentSpeed;
@@ -273,7 +274,7 @@ public class Player {
 
     public void setNetworkState(float x, float y, float vx, float vy, boolean lightOn, boolean running,
                                 boolean moving, float staminaValue, int ammoValue, boolean hasKeycardValue,
-                                float aimAngle, Role roleValue) {
+                                float aimAngle, Role roleValue, boolean downed) {
         body.setTransform(x, y, body.getAngle());
         body.setLinearVelocity(vx, vy);
         isLightOn = lightOn && canUseFlashlight(roleValue);
@@ -284,6 +285,7 @@ public class Player {
         ammo = ammoValue;
         hasKeycard = hasKeycardValue;
         currentAngle = aimAngle;
+        isDowned = downed;
         if (roleValue != null) {
             role = roleValue;
         }
@@ -299,13 +301,24 @@ public class Player {
         }
     }
 
+    public boolean isDowned() { return isDowned; }
+
+    public void setDowned(boolean downed) {
+        isDowned = downed;
+        if (isDowned) {
+            isRunning = false;
+            flashlight.setActive(false);
+            isLightOn = false;
+        }
+    }
+
     public void setActionListener(ActionListener listener) {
         this.actionListener = listener;
     }
 
     public boolean canUseFlashlight() { return canUseFlashlight(role); }
 
-    public boolean canThrowStones() { return role == Role.ALL || role == Role.STONES; }
+    public boolean canThrowStones() { return !isDowned && (role == Role.ALL || role == Role.STONES); }
 
     private boolean canUseFlashlight(Role roleValue) {
         return roleValue == Role.ALL || roleValue == Role.FLASHLIGHT;

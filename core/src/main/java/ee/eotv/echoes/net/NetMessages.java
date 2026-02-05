@@ -38,6 +38,7 @@ public class NetMessages {
         public boolean right;
         public boolean run;
         public boolean toggleLight;
+        public boolean revive;
         public float aimAngle;
     }
 
@@ -72,6 +73,7 @@ public class NetMessages {
         public boolean hasKeycard;
         public float aimAngle;
         public Player.Role role;
+        public boolean downed;
     }
 
     public static class EnemyState {
