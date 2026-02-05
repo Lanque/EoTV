@@ -20,6 +20,10 @@ public class StoneManager {
         void onStoneImpact(float x, float y, float radius, Color color);
     }
 
+    public interface StoneThrowListener {
+        void onStoneThrow(float x, float y);
+    }
+
     private class Stone {
         Body body;
         float timeAlive = 0;
@@ -37,6 +41,7 @@ public class StoneManager {
     public float maxPower = 1.2f;
     public boolean isCharging = false;
     private StoneImpactListener impactListener;
+    private StoneThrowListener throwListener;
 
     public StoneManager(World world, LevelManager lm, SoundManager sm) {
         this.world = world;
@@ -49,6 +54,10 @@ public class StoneManager {
         this.impactListener = listener;
     }
 
+    public void setThrowListener(StoneThrowListener listener) {
+        this.throwListener = listener;
+    }
+
     public void handleInput(Player p, Camera cam) {
         if (!p.canThrowStones()) return;
         if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && p.ammo > 0) {
@@ -56,7 +65,11 @@ public class StoneManager {
             currentPower = Math.min(currentPower + 1.5f * Gdx.graphics.getDeltaTime(), maxPower);
         } else if (isCharging) {
             throwStone(p, cam, currentPower);
-            if (soundManager != null) soundManager.playThrow();
+            if (throwListener != null) {
+                throwListener.onStoneThrow(p.getPosition().x, p.getPosition().y);
+            } else if (soundManager != null) {
+                soundManager.playThrow();
+            }
             p.ammo--;
             currentPower = 0;
             isCharging = false;
@@ -112,7 +125,11 @@ public class StoneManager {
         Vector2 dir = new Vector2(targetX - pos.x, targetY - pos.y).nor();
         throwStoneAt(pos, dir, Math.min(power, maxPower));
         p.ammo--;
-        if (soundManager != null) soundManager.playThrow();
+        if (throwListener != null) {
+            throwListener.onStoneThrow(pos.x, pos.y);
+        } else if (soundManager != null) {
+            soundManager.playThrow();
+        }
     }
 
     private void throwStoneAt(Vector2 pos, Vector2 dir, float power) {
@@ -148,7 +165,7 @@ public class StoneManager {
                 float echoY = s.body.getPosition().y;
                 Color echoColor = new Color(0.4f, 0.7f, 1f, 1f);
                 levelManager.addEcho(echoX, echoY, 15f, echoColor);
-                if (soundManager != null) soundManager.playHit();
+                if (impactListener == null && soundManager != null) soundManager.playHit();
 
                 if (levelManager != null) {
                     for (ee.eotv.echoes.entities.Enemy enemy : levelManager.getEnemies()) {

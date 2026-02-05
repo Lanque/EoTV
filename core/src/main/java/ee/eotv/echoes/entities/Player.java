@@ -18,6 +18,11 @@ import ee.eotv.echoes.world.LevelManager;
 import ee.eotv.echoes.managers.SoundManager;
 
 public class Player {
+    public interface ActionListener {
+        void onStep(Player player);
+        void onLightToggle(Player player, boolean lightOn);
+    }
+
     public enum Role {
         ALL,
         FLASHLIGHT,
@@ -33,6 +38,7 @@ public class Player {
     public boolean isMoving = false;
     public boolean isLightOn = true;
     private Role role = Role.ALL;
+    private ActionListener actionListener;
 
     // --- STAMINA ---
     public float maxStamina = 100f;
@@ -188,7 +194,9 @@ public class Player {
         if (input.toggleLight && canUseFlashlight()) {
             isLightOn = !isLightOn;
             flashlight.setActive(isLightOn);
-            if (sm != null) {
+            if (actionListener != null) {
+                actionListener.onLightToggle(this, isLightOn);
+            } else if (sm != null) {
                 if (isLightOn) sm.playLightOn(); else sm.playLightOff();
             }
         }
@@ -242,7 +250,11 @@ public class Player {
                 if (lm != null) {
                     lm.addEcho(body.getPosition().x, body.getPosition().y, echoRadius, echoColor);
                 }
-                if (sm != null) sm.playStep();
+                if (actionListener != null) {
+                    actionListener.onStep(this);
+                } else if (sm != null) {
+                    sm.playStep();
+                }
                 stepTimer = 0;
             }
         }
@@ -285,6 +297,10 @@ public class Player {
             isLightOn = false;
             flashlight.setActive(false);
         }
+    }
+
+    public void setActionListener(ActionListener listener) {
+        this.actionListener = listener;
     }
 
     public boolean canUseFlashlight() { return canUseFlashlight(role); }

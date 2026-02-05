@@ -67,36 +67,62 @@ public class SoundManager implements Disposable {
     }
 
     public void playStep() {
+        playStep(0.3f);
+    }
+
+    public void playStep(float volume) {
         if (stepSound != null) {
-            long id = stepSound.play(0.3f);
+            long id = stepSound.play(volume);
             stepSound.setPitch(id, MathUtils.random(0.9f, 1.1f));
         }
     }
 
     public void playThrow() {
-        if (throwSound != null) throwSound.play(1.0f);
+        playThrow(1.0f);
+    }
+
+    public void playThrow(float volume) {
+        if (throwSound != null) throwSound.play(volume);
     }
 
     public void playHit() {
-        if (hitSound != null) hitSound.play(0.8f);
+        playHit(0.8f);
+    }
+
+    public void playHit(float volume) {
+        if (hitSound != null) hitSound.play(volume);
     }
 
     public void playCollect() {
-        if (collectSound != null) collectSound.play(0.6f);
+        playCollect(0.6f);
+    }
+
+    public void playCollect(float volume) {
+        if (collectSound != null) collectSound.play(volume);
     }
 
     public void playDoor() {
-        if (doorSound != null) doorSound.play(1.0f);
+        playDoor(1.0f);
+    }
+
+    public void playDoor(float volume) {
+        if (doorSound != null) doorSound.play(volume);
     }
 
     public void playLightOn() {
-        if (lightOnSound != null) lightOnSound.play(0.5f);
+        playLightOn(0.5f);
+    }
+
+    public void playLightOn(float volume) {
+        if (lightOnSound != null) lightOnSound.play(volume);
     }
 
     public void playLightOff() {
-        if (lightOffSound != null) {
-            lightOffSound.play(0.5f);
-        }
+        playLightOff(0.5f);
+    }
+
+    public void playLightOff(float volume) {
+        if (lightOffSound != null) lightOffSound.play(volume);
     }
 
     // --- UUS: Click meetod ---
