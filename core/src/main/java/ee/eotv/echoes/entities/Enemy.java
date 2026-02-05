@@ -163,6 +163,12 @@ public class Enemy {
         if (texture != null) texture.dispose();
     }
 
+    public void setNetworkState(float x, float y, float vx, float vy, boolean facingRightValue) {
+        body.setTransform(x, y, body.getAngle());
+        body.setLinearVelocity(vx, vy);
+        facingRight = facingRightValue;
+    }
+
     public void setPatrolPoints(Array<Vector2> points) {
         patrolPoints.clear();
         if (points != null && points.size > 0) {

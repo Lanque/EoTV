@@ -18,6 +18,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import ee.eotv.echoes.Main;
 import ee.eotv.echoes.managers.SaveManager;
 import ee.eotv.echoes.managers.SoundManager; // UUS IMPORT
+import ee.eotv.echoes.screens.MultiplayerMenuScreen;
 
 public class MainMenuScreen implements Screen {
     private final Main game;
@@ -78,9 +79,20 @@ public class MainMenuScreen implements Screen {
             }
         });
 
+        TextButton multiplayerBtn = new TextButton("MULTIPLAYER", skin);
+        multiplayerBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                soundManager.playClick();
+                soundManager.stopMenuMusic();
+                game.setScreen(new MultiplayerMenuScreen(game));
+            }
+        });
+
         table.add(titleLabel).padBottom(50).row();
         table.add(newGameBtn).width(200).height(50).pad(10).row();
         table.add(loadGameBtn).width(200).height(50).pad(10).row();
+        table.add(multiplayerBtn).width(200).height(50).pad(10).row();
         table.add(exitBtn).width(200).height(50).pad(10);
 
         stage.addActor(table);

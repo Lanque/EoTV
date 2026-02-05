@@ -286,6 +286,14 @@ public class LevelManager {
 
     public void update(float delta) {
         world.step(1/60f, 6, 2);
+        updateEchoes(delta);
+    }
+
+    public void updateClient(float delta) {
+        updateEchoes(delta);
+    }
+
+    private void updateEchoes(float delta) {
         Iterator<PointLight> iter = activeEchoes.iterator();
         while (iter.hasNext()) {
             PointLight light = iter.next();

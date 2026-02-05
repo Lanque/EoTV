@@ -18,6 +18,12 @@ import ee.eotv.echoes.world.LevelManager;
 import ee.eotv.echoes.managers.SoundManager;
 
 public class Player {
+    public enum Role {
+        ALL,
+        FLASHLIGHT,
+        STONES
+    }
+
     private Body body;
     private ConeLight flashlight;
 
@@ -26,6 +32,7 @@ public class Player {
     public boolean isRunning = false;
     public boolean isMoving = false;
     public boolean isLightOn = true;
+    private Role role = Role.ALL;
 
     // --- STAMINA ---
     public float maxStamina = 100f;
@@ -145,31 +152,40 @@ public class Player {
         handleInput(camera, delta, sm);
 
         isMoving = body.getLinearVelocity().len() > 0.1f;
-
-        if (isMoving) {
-            stepTimer += delta;
-            float currentInterval = isRunning ? 0.3f : 0.6f;
-
-            // Animatsioon kiiremaks, kui jookseb
-            runAnimation.setFrameDuration(isRunning ? 0.07f : 0.15f);
-
-            if (stepTimer >= currentInterval) {
-                float echoRadius = isRunning ? 32f : 18f;
-
-                // PARANDUS: Jooksmise ajal on kaja läbipaistvam (0.25f), et ei oleks liiga ere
-                Color echoColor = isRunning ?
-                    new Color(0.5f, 0.7f, 1f, 0.5f) :
-                    new Color(0.4f, 0.5f, 0.8f, 0.5f);
-
-                lm.addEcho(body.getPosition().x, body.getPosition().y, echoRadius, echoColor);
-                if (sm != null) sm.playStep();
-                stepTimer = 0;
-            }
-        }
+        updateMovementEffects(delta, lm, sm);
     }
 
     private void handleInput(Camera camera, float delta, SoundManager sm) {
-        if (Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.F)) {
+        boolean toggleLight = Gdx.input.isKeyJustPressed(Input.Keys.SPACE) || Gdx.input.isKeyJustPressed(Input.Keys.F);
+        applyInput(buildInputFromDevice(camera, toggleLight), delta, sm);
+    }
+
+    public void updateFromInput(float delta, PlayerInput input, SoundManager sm, LevelManager lm) {
+        applyInput(input, delta, sm);
+        isMoving = body.getLinearVelocity().len() > 0.1f;
+        updateMovementEffects(delta, lm, sm);
+    }
+
+    private PlayerInput buildInputFromDevice(Camera camera, boolean toggleLight) {
+        PlayerInput input = new PlayerInput();
+        input.toggleLight = toggleLight;
+        input.wantsToRun = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
+        input.up = Gdx.input.isKeyPressed(Input.Keys.W);
+        input.down = Gdx.input.isKeyPressed(Input.Keys.S);
+        input.left = Gdx.input.isKeyPressed(Input.Keys.A);
+        input.right = Gdx.input.isKeyPressed(Input.Keys.D);
+
+        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
+        camera.unproject(mouse);
+        float angleRad = MathUtils.atan2(mouse.y - body.getPosition().y, mouse.x - body.getPosition().x);
+        input.aimAngle = angleRad * MathUtils.radDeg;
+        return input;
+    }
+
+    private void applyInput(PlayerInput input, float delta, SoundManager sm) {
+        if (input == null) return;
+
+        if (input.toggleLight && canUseFlashlight()) {
             isLightOn = !isLightOn;
             flashlight.setActive(isLightOn);
             if (sm != null) {
@@ -177,7 +193,7 @@ public class Player {
             }
         }
 
-        boolean wantsToRun = Gdx.input.isKeyPressed(Input.Keys.SHIFT_LEFT);
+        boolean wantsToRun = input.wantsToRun;
 
         if (isExhausted) {
             if (stamina > 25f) isExhausted = false;
@@ -201,26 +217,92 @@ public class Player {
 
         float currentSpeed = isRunning ? runSpeed : walkSpeed;
         float vx = 0, vy = 0;
-        if (Gdx.input.isKeyPressed(Input.Keys.W)) vy = currentSpeed;
-        if (Gdx.input.isKeyPressed(Input.Keys.S)) vy = -currentSpeed;
-        if (Gdx.input.isKeyPressed(Input.Keys.A)) vx = -currentSpeed;
-        if (Gdx.input.isKeyPressed(Input.Keys.D)) vx = currentSpeed;
+        if (input.up) vy = currentSpeed;
+        if (input.down) vy = -currentSpeed;
+        if (input.left) vx = -currentSpeed;
+        if (input.right) vx = currentSpeed;
         body.setLinearVelocity(vx, vy);
 
-        // Hiire loogika: arvutame nurga ja salvestame selle
-        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mouse);
-        float angleRad = MathUtils.atan2(mouse.y - body.getPosition().y, mouse.x - body.getPosition().x);
+        currentAngle = input.aimAngle;
+    }
 
-        // Konverteerime kraadideks ja salvestame klassimuutujasse
-        currentAngle = angleRad * MathUtils.radDeg;
+    private void updateMovementEffects(float delta, LevelManager lm, SoundManager sm) {
+        if (isMoving) {
+            stepTimer += delta;
+            float currentInterval = isRunning ? 0.3f : 0.6f;
+
+            runAnimation.setFrameDuration(isRunning ? 0.07f : 0.15f);
+
+            if (stepTimer >= currentInterval) {
+                float echoRadius = isRunning ? 32f : 18f;
+                Color echoColor = isRunning ?
+                    new Color(0.5f, 0.7f, 1f, 0.5f) :
+                    new Color(0.4f, 0.5f, 0.8f, 0.5f);
+
+                if (lm != null) {
+                    lm.addEcho(body.getPosition().x, body.getPosition().y, echoRadius, echoColor);
+                }
+                if (sm != null) sm.playStep();
+                stepTimer = 0;
+            }
+        }
     }
 
     public Vector2 getPosition() { return body.getPosition(); }
 
+    public Vector2 getVelocity() { return body.getLinearVelocity(); }
+
+    public float getAimAngle() { return currentAngle; }
+
     public void setPosition(float x, float y) {
         body.setTransform(x, y, body.getAngle());
         flashlight.setPosition(x, y); // Uuendame ka valgust koheselt
+    }
+
+    public void setNetworkState(float x, float y, float vx, float vy, boolean lightOn, boolean running,
+                                boolean moving, float staminaValue, int ammoValue, boolean hasKeycardValue,
+                                float aimAngle, Role roleValue) {
+        body.setTransform(x, y, body.getAngle());
+        body.setLinearVelocity(vx, vy);
+        isLightOn = lightOn && canUseFlashlight(roleValue);
+        flashlight.setActive(isLightOn);
+        isRunning = running;
+        isMoving = moving;
+        stamina = staminaValue;
+        ammo = ammoValue;
+        hasKeycard = hasKeycardValue;
+        currentAngle = aimAngle;
+        if (roleValue != null) {
+            role = roleValue;
+        }
+    }
+
+    public Role getRole() { return role; }
+
+    public void setRole(Role role) {
+        this.role = role;
+        if (!canUseFlashlight()) {
+            isLightOn = false;
+            flashlight.setActive(false);
+        }
+    }
+
+    public boolean canUseFlashlight() { return canUseFlashlight(role); }
+
+    public boolean canThrowStones() { return role == Role.ALL || role == Role.STONES; }
+
+    private boolean canUseFlashlight(Role roleValue) {
+        return roleValue == Role.ALL || roleValue == Role.FLASHLIGHT;
+    }
+
+    public static class PlayerInput {
+        public boolean up;
+        public boolean down;
+        public boolean left;
+        public boolean right;
+        public boolean wantsToRun;
+        public boolean toggleLight;
+        public float aimAngle;
     }
 
     public void dispose() {
