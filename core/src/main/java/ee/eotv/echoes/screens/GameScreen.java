@@ -238,7 +238,7 @@ public class GameScreen implements Screen {
 
                 // --- UUS: UUENDAME KÕIKI VAENLASI ---
                 for (Enemy enemy : levelManager.getEnemies()) {
-                    enemy.update(player);
+                    enemy.update(player, delta);
                 }
 
                 // ESEMED

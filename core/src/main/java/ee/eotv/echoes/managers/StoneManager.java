@@ -8,7 +8,6 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.*;
-import ee.eotv.echoes.Main;
 import ee.eotv.echoes.entities.Item;
 import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.world.LevelManager;
@@ -124,8 +123,10 @@ public class StoneManager {
                 levelManager.addEcho(s.body.getPosition().x, s.body.getPosition().y);
                 if (soundManager != null) soundManager.playHit();
 
-                if (Main.zombiInstance != null) {
-                    Main.zombiInstance.investigate(s.body.getPosition().x, s.body.getPosition().y);
+                if (levelManager != null) {
+                    for (ee.eotv.echoes.entities.Enemy enemy : levelManager.getEnemies()) {
+                        enemy.investigate(s.body.getPosition().x, s.body.getPosition().y);
+                    }
                 }
 
                 // 2. MUUDA KOHE KORJATAVAKS ESEMEKS
