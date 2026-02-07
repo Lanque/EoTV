@@ -50,6 +50,8 @@ public class LevelManager {
     //  Z = Vaenlane (Zombie)
     //
     //  E = Võidutsoon (Exit)
+    //
+    // G = Generaator
     private String[] levelLayout = {
         "############################################################",
         "#..........................................................#",
