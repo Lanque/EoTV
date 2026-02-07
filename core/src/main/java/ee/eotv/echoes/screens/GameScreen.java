@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.scenes.scene2d.InputEvent;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -22,6 +23,7 @@ import ee.eotv.echoes.Main;
 import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.entities.Enemy;
 import ee.eotv.echoes.entities.Item;
+import ee.eotv.echoes.entities.Generator;
 import ee.eotv.echoes.managers.StoneManager;
 import ee.eotv.echoes.world.LevelManager;
 import ee.eotv.echoes.ui.Hud;
@@ -43,6 +45,10 @@ public class GameScreen implements Screen {
     private OrthographicCamera camera;
     private Hud hud;
     private SoundManager soundManager;
+    private BitmapFont overlayFont;
+    private ShapeRenderer overlayRenderer;
+    private float generatorRepairTime = 10f;
+    private float generatorRepairRange = 1.2f;
 
     // --- MENÜÜD ---
     private boolean isPaused = false;
@@ -78,6 +84,8 @@ public class GameScreen implements Screen {
         stoneManager = new StoneManager(levelManager.world, levelManager, soundManager);
 
         hud = new Hud();
+        overlayFont = new BitmapFont();
+        overlayRenderer = new ShapeRenderer();
 
         stage = new Stage(new ScreenViewport());
         skin = createBasicSkin();
@@ -231,13 +239,20 @@ public class GameScreen implements Screen {
                 gameOverTable.setVisible(true);
                 Gdx.input.setInputProcessor(stage);
             } else {
+                boolean holdRepair = Gdx.input.isKeyPressed(Input.Keys.E);
+                Generator repairTarget = (!player.isDowned() && holdRepair) ? findRepairTarget(player) : null;
+                player.setFrozen(repairTarget != null);
+
                 player.update(delta, levelManager, camera, soundManager);
-                stoneManager.handleInput(player, camera);
+                if (repairTarget == null) {
+                    stoneManager.handleInput(player, camera);
+                }
                 levelManager.update(delta);
                 stoneManager.update(delta);
 
                 // --- UUS: UUENDAME KÕIKI VAENLASI ---
                 for (Enemy enemy : levelManager.getEnemies()) {
+                    if (!enemy.isActive()) continue;
                     enemy.update(player, delta);
                 }
 
@@ -268,7 +283,8 @@ public class GameScreen implements Screen {
                 }
 
                 // VÕIT
-                if (levelManager.getExitZone() != null) {
+                updateGenerators(delta, repairTarget);
+                if (levelManager.isExitUnlocked() && levelManager.getExitZone() != null) {
                     Rectangle playerRect = new Rectangle(player.getPosition().x - 0.2f, player.getPosition().y - 0.2f, 0.4f, 0.4f);
                     if (playerRect.overlaps(levelManager.getExitZone().getBounds())) {
                         isVictory = true;
@@ -288,6 +304,7 @@ public class GameScreen implements Screen {
         levelManager.drawWorld(camera);
         levelManager.drawItems(camera);
         levelManager.drawDoors(camera);
+        levelManager.drawGenerators(camera);
 
         game.batch.setProjectionMatrix(camera.combined);
         game.batch.begin();
@@ -306,6 +323,7 @@ public class GameScreen implements Screen {
         stoneManager.renderTrajectory(player, camera);
 
         hud.render(player, camera);
+        renderGeneratorPrompt();
 
         if (isPaused || isVictory || isGameOverState) {
             Gdx.gl.glEnable(GL20.GL_BLEND);
@@ -313,6 +331,87 @@ public class GameScreen implements Screen {
             stage.act(delta);
             stage.draw();
         }
+    }
+
+    private Generator findRepairTarget(Player player) {
+        Generator closest = null;
+        float bestDist = generatorRepairRange;
+        for (Generator generator : levelManager.getGenerators()) {
+            if (generator.isRepaired()) continue;
+            float dist = player.getPosition().dst(generator.getPosition());
+            if (dist <= bestDist) {
+                bestDist = dist;
+                closest = generator;
+            }
+        }
+        return closest;
+    }
+
+    private void updateGenerators(float delta, Generator repairTarget) {
+        for (Generator generator : levelManager.getGenerators()) {
+            if (generator.isRepaired()) continue;
+            if (generator == repairTarget) {
+                float next = generator.getRepairProgress() + delta;
+                if (next >= generatorRepairTime) {
+                    generator.setRepaired(true);
+                } else {
+                    generator.setRepairProgress(next);
+                }
+            } else {
+                generator.setRepairProgress(0f);
+            }
+        }
+
+        if (!levelManager.isExitUnlocked() && levelManager.areAllGeneratorsRepaired()) {
+            levelManager.setExitUnlocked(true);
+        }
+        if (levelManager.isExitUnlocked()) {
+            clearEnemiesInSafeZone();
+        }
+    }
+
+    private void clearEnemiesInSafeZone() {
+        if (levelManager.getExitZone() == null) return;
+        Rectangle bounds = levelManager.getExitZone().getBounds();
+        for (Enemy enemy : levelManager.getEnemies()) {
+            if (enemy.isActive() && bounds.contains(enemy.getPosition())) {
+                enemy.setActive(false);
+            }
+        }
+    }
+
+    private void renderGeneratorPrompt() {
+        if (isPaused || isVictory || isGameOverState || player.isDowned()) return;
+        boolean isHoldingRepair = Gdx.input.isKeyPressed(Input.Keys.E);
+        Generator target = findRepairTarget(player);
+        if (target == null || target.isRepaired()) return;
+
+        String text = isHoldingRepair ? "Repairing generator..." : "Hold E to repair";
+        float textX = stage.getViewport().getWorldWidth() * 0.5f - 90f;
+        float textY = 60f;
+
+        overlayFont.getData().setScale(1.0f);
+        game.batch.setProjectionMatrix(stage.getCamera().combined);
+        game.batch.begin();
+        overlayFont.setColor(1f, 1f, 1f, 1f);
+        overlayFont.draw(game.batch, text, textX, textY);
+        game.batch.end();
+
+        float progress = Math.min(target.getRepairProgress() / generatorRepairTime, 1f);
+        if (!isHoldingRepair && progress <= 0f) return;
+
+        float barWidth = 160f;
+        float barHeight = 6f;
+        float barX = stage.getViewport().getWorldWidth() * 0.5f - barWidth * 0.5f;
+        float barY = 42f;
+
+        overlayRenderer.setProjectionMatrix(stage.getCamera().combined);
+        overlayRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        overlayRenderer.setColor(0.2f, 0.2f, 0.2f, 0.8f);
+        overlayRenderer.rect(barX, barY, barWidth, barHeight);
+        overlayRenderer.setColor(0.2f, 0.8f, 0.3f, 0.9f);
+        overlayRenderer.rect(barX, barY, barWidth * progress, barHeight);
+        overlayRenderer.end();
     }
 
     @Override public void resize(int width, int height) { stage.getViewport().update(width, height, true); }
@@ -329,6 +428,8 @@ public class GameScreen implements Screen {
         stage.dispose();
         skin.dispose();
         player.dispose();
+        overlayFont.dispose();
+        overlayRenderer.dispose();
 
         // UUS: Vabastame vaenlaste tekstuurid
         for (ee.eotv.echoes.entities.Enemy enemy : levelManager.getEnemies()) {

@@ -46,13 +46,14 @@ public class Enemy {
     // Suurus maailmas (meetrites)
     private float width = 1.0f;
     private float height = 1.0f;
+    private boolean active = true;
 
     // Nihutamine (kui pilt ei ole tÃ¤pselt kasti keskel)
     private float drawOffsetX = 0f;
     private float drawOffsetY = 0.1f; // TÃµstame natuke Ã¼les
 
     public Enemy(World world, float x, float y) {
-        // 1. FÃœÃœSIKA (Sama mis enne)
+        // 1. FüüSIKA (Sama mis enne)
         BodyDef def = new BodyDef();
         def.type = BodyDef.BodyType.DynamicBody;
         def.position.set(x, y);
@@ -111,6 +112,7 @@ public class Enemy {
     }
 
     public void update(Player player, float delta) {
+        if (!active) return;
         updateState(player, delta);
 
         Vector2 myPos = body.getPosition();
@@ -132,6 +134,7 @@ public class Enemy {
 
     // --- JOONISTAMINE ---
     public void render(SpriteBatch batch) {
+        if (!active) return;
         stateTime += Gdx.graphics.getDeltaTime();
 
         TextureRegion currentFrame;
@@ -174,9 +177,29 @@ public class Enemy {
     }
 
     public void setNetworkState(float x, float y, float vx, float vy, boolean facingRightValue) {
-        body.setTransform(x, y, body.getAngle());
-        body.setLinearVelocity(vx, vy);
-        facingRight = facingRightValue;
+        setNetworkState(x, y, vx, vy, facingRightValue, true);
+    }
+
+    public void setNetworkState(float x, float y, float vx, float vy, boolean facingRightValue, boolean isActive) {
+        active = isActive;
+        body.setActive(isActive);
+        if (isActive) {
+            body.setTransform(x, y, body.getAngle());
+            body.setLinearVelocity(vx, vy);
+            facingRight = facingRightValue;
+        } else {
+            body.setLinearVelocity(0, 0);
+        }
+    }
+
+    public boolean isActive() { return active; }
+
+    public void setActive(boolean isActive) {
+        active = isActive;
+        body.setActive(isActive);
+        if (!isActive) {
+            body.setLinearVelocity(0, 0);
+        }
     }
 
     public void setPatrolPoints(Array<Vector2> points) {

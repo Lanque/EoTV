@@ -55,6 +55,8 @@ public class NetMessages {
         public EnemyState[] enemies;
         public ItemState[] items;
         public DoorState[] doors;
+        public GeneratorState[] generators;
+        public boolean exitUnlocked;
         public boolean gameOver;
         public boolean victory;
     }
@@ -83,6 +85,7 @@ public class NetMessages {
         public float vx;
         public float vy;
         public boolean facingRight;
+        public boolean active;
     }
 
     public static class ItemState {
@@ -95,6 +98,14 @@ public class NetMessages {
         public float x;
         public float y;
         public boolean open;
+    }
+
+    public static class GeneratorState {
+        public int index;
+        public float x;
+        public float y;
+        public boolean repaired;
+        public float progress;
     }
 
     public static class EchoEvent {

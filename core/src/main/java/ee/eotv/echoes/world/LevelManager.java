@@ -13,6 +13,7 @@ import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.entities.Enemy;
 import ee.eotv.echoes.entities.Door;
 import ee.eotv.echoes.entities.ExitZone;
+import ee.eotv.echoes.entities.Generator;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -28,7 +29,10 @@ public class LevelManager {
     private ArrayList<Item> items = new ArrayList<>();
     private ArrayList<Door> doors = new ArrayList<>();
     private ArrayList<Enemy> enemies = new ArrayList<>(); // UUS: Nimekiri vaenlastest
+    private ArrayList<Generator> generators = new ArrayList<>();
     private ExitZone exitZone;
+    private PointLight exitLight;
+    private boolean exitUnlocked = false;
 
     // --- SUUR KAART (60x30) ---
     // Saad siin joonistada leveli kasutades sümboleid.
@@ -58,12 +62,12 @@ public class LevelManager {
         "#######.####...###########.......###########################",
         "#..........#...#.........#.......#.........................#",
         "#..........#...#.................#.........................#",
-        "#...########...#....Z....#.......#........##.#######.......#",
+        "#...########...#G...Z....#.......#........##.#######.......#",
         "#...#......#...#.........#.......#.................#.......#",
         "#...#..S...#...###########.......#........#...Z....#.......#",
-        "#...#......#.....................D........#........#.......#",
+        "#...#......#.....................D........#.......G#.......#",
         "#...##.#####...###########.......#........##########.......#",
-        "#..............#.........#.......#.........................#",
+        "#..............#....G....#.......#.........................#",
         "################.........#.......###########################",
         "#........................#.......#.........................#",
         "#..###########...#########.......#.........................#",
@@ -92,6 +96,7 @@ public class LevelManager {
 
         // Parsime kaardi ja loome maailma
         createLevelFromMap();
+        setExitUnlocked(generators.isEmpty());
     }
 
     // --- PARSIMISE LOOGIKA ---
@@ -124,6 +129,9 @@ public class LevelManager {
                     case 'Z': // Zombie
                         spawnEnemy(worldX + 0.5f, worldY + 0.5f);
                         break;
+                    case 'G': // Generator
+                        spawnGenerator(worldX + 0.5f, worldY + 0.5f);
+                        break;
                     case 'E': // Exit Zone
                         exitZone = new ExitZone(worldX, worldY, 2, 2);
                         break;
@@ -136,6 +144,18 @@ public class LevelManager {
     }
 
     public ExitZone getExitZone() { return exitZone; }
+    public boolean isExitUnlocked() { return exitUnlocked; }
+
+    public void setExitUnlocked(boolean unlocked) {
+        if (exitUnlocked == unlocked) return;
+        exitUnlocked = unlocked;
+        if (exitUnlocked && exitZone != null && exitLight == null) {
+            float centerX = exitZone.getBounds().x + exitZone.getBounds().width * 0.5f;
+            float centerY = exitZone.getBounds().y + exitZone.getBounds().height * 0.5f;
+            exitLight = new PointLight(rayHandler, 64, new Color(1f, 0.95f, 0.8f, 1f), 7f, centerX, centerY);
+            exitLight.setSoft(true);
+        }
+    }
 
     public void spawnItem(Item.Type type, float x, float y) { items.add(new Item(type, x, y)); }
     public ArrayList<Item> getItems() { return items; }
@@ -150,6 +170,17 @@ public class LevelManager {
         enemies.add(enemy);
     }
     public ArrayList<Enemy> getEnemies() { return enemies; }
+
+    public void spawnGenerator(float x, float y) { generators.add(new Generator(x, y)); }
+    public ArrayList<Generator> getGenerators() { return generators; }
+
+    public boolean areAllGeneratorsRepaired() {
+        if (generators.isEmpty()) return true;
+        for (Generator generator : generators) {
+            if (!generator.isRepaired()) return false;
+        }
+        return true;
+    }
 
     public void drawWorld(OrthographicCamera camera) {
         shapeRenderer.setProjectionMatrix(camera.combined);
@@ -172,7 +203,7 @@ public class LevelManager {
                 }
             }
         }
-        if (exitZone != null) exitZone.render(shapeRenderer);
+        if (exitZone != null && exitUnlocked) exitZone.render(shapeRenderer);
         shapeRenderer.end();
     }
 
@@ -187,6 +218,13 @@ public class LevelManager {
         shapeRenderer.setProjectionMatrix(camera.combined);
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
         for (Door door : doors) door.render(shapeRenderer);
+        shapeRenderer.end();
+    }
+
+    public void drawGenerators(OrthographicCamera camera) {
+        shapeRenderer.setProjectionMatrix(camera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        for (Generator generator : generators) generator.render(shapeRenderer);
         shapeRenderer.end();
     }
 
@@ -311,6 +349,7 @@ public class LevelManager {
     }
 
     public void dispose() {
+        if (exitLight != null) exitLight.remove();
         world.dispose();
         rayHandler.dispose();
         shapeRenderer.dispose();

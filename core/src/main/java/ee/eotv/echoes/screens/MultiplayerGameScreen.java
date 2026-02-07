@@ -24,6 +24,7 @@ import ee.eotv.echoes.Main;
 import ee.eotv.echoes.entities.Door;
 import ee.eotv.echoes.entities.Enemy;
 import ee.eotv.echoes.entities.Item;
+import ee.eotv.echoes.entities.Generator;
 import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.managers.SoundManager;
 import ee.eotv.echoes.managers.StoneManager;
@@ -62,6 +63,7 @@ public class MultiplayerGameScreen implements Screen {
     private Skin skin;
     private Table pauseTable;
     private Table gameOverTable;
+    private Table victoryTable;
     private boolean isPaused = false;
     private BitmapFont overlayFont;
 
@@ -70,6 +72,9 @@ public class MultiplayerGameScreen implements Screen {
     private float reviveTimerForHost = 0f;
     private float reviveTimerForClient = 0f;
     private float reviveDisplayTimer = 0f;
+
+    private float generatorRepairTime = 10f;
+    private float generatorRepairRange = 1.2f;
 
     private float currentPower = 0f;
     private float maxPower = 1.2f;
@@ -109,6 +114,7 @@ public class MultiplayerGameScreen implements Screen {
         stage = new Stage(new ScreenViewport());
         skin = createBasicSkin();
         createPauseMenu();
+        createVictoryMenu();
         overlayFont = new BitmapFont();
 
         Vector2 hostStart = new Vector2(2, 25);
@@ -178,6 +184,11 @@ public class MultiplayerGameScreen implements Screen {
             renderGameOverMenu(delta);
             return;
         }
+        if (isVictory) {
+            drawScene(delta);
+            renderVictoryMenu(delta);
+            return;
+        }
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             togglePause();
@@ -210,6 +221,7 @@ public class MultiplayerGameScreen implements Screen {
         levelManager.drawWorld(camera);
         levelManager.drawItems(camera);
         levelManager.drawDoors(camera);
+        levelManager.drawGenerators(camera);
 
         game.batch.setProjectionMatrix(camera.combined);
         game.batch.begin();
@@ -231,24 +243,38 @@ public class MultiplayerGameScreen implements Screen {
             renderDownedOverlay();
         }
         renderRevivePrompt();
+        renderGeneratorPrompt();
     }
 
     private void updateHost(float delta) {
         if (!isGameOver && !isVictory) {
+            NetMessages.InputState remoteInput = server.getLatestInput(remotePlayerId);
+            boolean localHoldRepair = Gdx.input.isKeyPressed(Input.Keys.E);
+            boolean remoteHoldRepair = remoteInput != null && remoteInput.revive;
+            boolean localAttemptRevive = isAttemptingRevive(localPlayer, remotePlayer, localHoldRepair);
+            boolean remoteAttemptRevive = isAttemptingRevive(remotePlayer, localPlayer, remoteHoldRepair);
+
+            Generator localTarget = (!localPlayer.isDowned() && localHoldRepair && !localAttemptRevive)
+                ? findRepairTarget(localPlayer) : null;
+            Generator remoteTarget = (!remotePlayer.isDowned() && remoteHoldRepair && !remoteAttemptRevive)
+                ? findRepairTarget(remotePlayer) : null;
+
+            localPlayer.setFrozen(localTarget != null);
+            remotePlayer.setFrozen(remoteTarget != null);
+
             localPlayer.update(delta, levelManager, camera, soundManager);
 
-            NetMessages.InputState remoteInput = server.getLatestInput(remotePlayerId);
             Player.PlayerInput converted = convertInput(remoteInput);
             remotePlayer.updateFromInput(delta, converted, soundManager, levelManager);
 
-            if (localPlayer.canThrowStones()) {
+            if (localPlayer.canThrowStones() && localTarget == null) {
                 stoneManager.handleInput(localPlayer, camera);
             }
 
             Queue<NetMessages.ThrowStone> throwQueue = server.getThrowQueue();
             NetMessages.ThrowStone throwStone;
             while ((throwStone = throwQueue.poll()) != null) {
-                if (throwStone.playerId == remotePlayerId) {
+                if (throwStone.playerId == remotePlayerId && remoteTarget == null) {
                     stoneManager.throwStoneFromNetwork(remotePlayer, throwStone.targetX, throwStone.targetY, throwStone.power);
                 }
             }
@@ -257,11 +283,13 @@ public class MultiplayerGameScreen implements Screen {
             stoneManager.update(delta);
 
             for (Enemy enemy : levelManager.getEnemies()) {
+                if (!enemy.isActive()) continue;
                 Player closest = getClosestPlayer(enemy);
                 enemy.update(closest, delta);
             }
 
             handleDownedState(delta, remoteInput);
+            updateGenerators(delta, localTarget, remoteTarget);
             updateItemsAndDoors();
             updateVictoryAndGameOver();
         }
@@ -325,10 +353,10 @@ public class MultiplayerGameScreen implements Screen {
             isGameOver = true;
         }
 
-        if (levelManager.getExitZone() != null) {
+        if (levelManager.isExitUnlocked() && levelManager.getExitZone() != null) {
             Rectangle localRect = new Rectangle(localPlayer.getPosition().x - 0.2f, localPlayer.getPosition().y - 0.2f, 0.4f, 0.4f);
             Rectangle remoteRect = new Rectangle(remotePlayer.getPosition().x - 0.2f, remotePlayer.getPosition().y - 0.2f, 0.4f, 0.4f);
-            if (localRect.overlaps(levelManager.getExitZone().getBounds()) ||
+            if (localRect.overlaps(levelManager.getExitZone().getBounds()) &&
                 remoteRect.overlaps(levelManager.getExitZone().getBounds())) {
                 isVictory = true;
             }
@@ -352,6 +380,7 @@ public class MultiplayerGameScreen implements Screen {
             es.vx = enemy.body.getLinearVelocity().x;
             es.vy = enemy.body.getLinearVelocity().y;
             es.facingRight = enemy.body.getLinearVelocity().x >= 0;
+            es.active = enemy.isActive();
             state.enemies[i] = es;
         }
 
@@ -375,6 +404,19 @@ public class MultiplayerGameScreen implements Screen {
             state.doors[i] = ds;
         }
 
+        state.generators = new NetMessages.GeneratorState[levelManager.getGenerators().size()];
+        for (int i = 0; i < levelManager.getGenerators().size(); i++) {
+            Generator generator = levelManager.getGenerators().get(i);
+            NetMessages.GeneratorState gs = new NetMessages.GeneratorState();
+            gs.index = i;
+            gs.x = generator.getPosition().x;
+            gs.y = generator.getPosition().y;
+            gs.repaired = generator.isRepaired();
+            gs.progress = generator.getRepairProgress();
+            state.generators[i] = gs;
+        }
+
+        state.exitUnlocked = levelManager.isExitUnlocked();
         state.gameOver = isGameOver;
         state.victory = isVictory;
         server.sendWorldState(state);
@@ -399,7 +441,11 @@ public class MultiplayerGameScreen implements Screen {
         input.aimAngle = (float) Math.toDegrees(angleRad);
         client.sendInput(input);
 
-        if (localRole == Player.Role.STONES) {
+        boolean isHoldingRepair = input.revive;
+        boolean isReviving = isAttemptingRevive(localPlayer, remotePlayer, isHoldingRepair);
+        boolean isRepairing = !isReviving && !localPlayer.isDowned() && isHoldingRepair && findRepairTarget(localPlayer) != null;
+
+        if (localRole == Player.Role.STONES && !isRepairing) {
             if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && localPlayer.ammo > 0) {
                 isCharging = true;
                 currentPower = Math.min(currentPower + 1.5f * Gdx.graphics.getDeltaTime(), maxPower);
@@ -413,6 +459,9 @@ public class MultiplayerGameScreen implements Screen {
                 currentPower = 0f;
                 isCharging = false;
             }
+        } else if (isRepairing) {
+            currentPower = 0f;
+            isCharging = false;
         }
     }
 
@@ -429,7 +478,7 @@ public class MultiplayerGameScreen implements Screen {
 
         for (NetMessages.EnemyState es : state.enemies) {
             if (es == null || es.index < 0 || es.index >= levelManager.getEnemies().size()) continue;
-            levelManager.getEnemies().get(es.index).setNetworkState(es.x, es.y, es.vx, es.vy, es.facingRight);
+            levelManager.getEnemies().get(es.index).setNetworkState(es.x, es.y, es.vx, es.vy, es.facingRight, es.active);
         }
 
         levelManager.getItems().clear();
@@ -446,6 +495,19 @@ public class MultiplayerGameScreen implements Screen {
                     if (ds.open && !door.isOpen()) door.open();
                 }
             }
+        }
+
+        if (state.generators != null) {
+            for (NetMessages.GeneratorState gs : state.generators) {
+                if (gs == null || gs.index < 0 || gs.index >= levelManager.getGenerators().size()) continue;
+                Generator generator = levelManager.getGenerators().get(gs.index);
+                generator.setRepairProgress(gs.progress);
+                generator.setRepaired(gs.repaired);
+            }
+        }
+
+        if (state.exitUnlocked != levelManager.isExitUnlocked()) {
+            levelManager.setExitUnlocked(state.exitUnlocked);
         }
 
         isGameOver = state.gameOver;
@@ -626,6 +688,43 @@ public class MultiplayerGameScreen implements Screen {
         overlayRenderer.end();
     }
 
+    private void renderGeneratorPrompt() {
+        if (localPlayer.isDowned()) return;
+        boolean isHoldingRepair = Gdx.input.isKeyPressed(Input.Keys.E);
+        boolean isReviving = isAttemptingRevive(localPlayer, remotePlayer, isHoldingRepair);
+        if (isReviving) return;
+
+        Generator target = findRepairTarget(localPlayer);
+        if (target == null || target.isRepaired()) return;
+
+        String text = isHoldingRepair ? "Repairing generator..." : "Hold E to repair";
+        float textX = stage.getViewport().getWorldWidth() * 0.5f - 90f;
+        float textY = 60f;
+
+        overlayFont.getData().setScale(1.0f);
+        game.batch.setProjectionMatrix(stage.getCamera().combined);
+        game.batch.begin();
+        overlayFont.setColor(1f, 1f, 1f, 1f);
+        overlayFont.draw(game.batch, text, textX, textY);
+        game.batch.end();
+
+        float progress = Math.min(target.getRepairProgress() / generatorRepairTime, 1f);
+        if (!isHoldingRepair && progress <= 0f) return;
+
+        float barWidth = 160f;
+        float barHeight = 6f;
+        float barX = stage.getViewport().getWorldWidth() * 0.5f - barWidth * 0.5f;
+        float barY = 42f;
+
+        overlayRenderer.setProjectionMatrix(stage.getCamera().combined);
+        overlayRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        overlayRenderer.setColor(0.2f, 0.2f, 0.2f, 0.8f);
+        overlayRenderer.rect(barX, barY, barWidth, barHeight);
+        overlayRenderer.setColor(0.2f, 0.8f, 0.3f, 0.9f);
+        overlayRenderer.rect(barX, barY, barWidth * progress, barHeight);
+        overlayRenderer.end();
+    }
+
     private void togglePause() {
         isPaused = !isPaused;
         if (isPaused) {
@@ -704,9 +803,57 @@ public class MultiplayerGameScreen implements Screen {
         stage.addActor(gameOverTable);
     }
 
+    private void createVictoryMenu() {
+        victoryTable = new Table();
+        victoryTable.setFillParent(true);
+
+        TextButton restartBtn = new TextButton("RESTART", skin);
+        restartBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (server != null) server.stop();
+                if (client != null) client.stop();
+                game.setScreen(new MultiplayerMenuScreen(game));
+            }
+        });
+
+        TextButton exitBtn = new TextButton("EXIT TO MENU", skin);
+        exitBtn.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (server != null) server.stop();
+                if (client != null) client.stop();
+                game.setScreen(new MainMenuScreen(game));
+            }
+        });
+
+        com.badlogic.gdx.scenes.scene2d.ui.Label victoryLabel =
+            new com.badlogic.gdx.scenes.scene2d.ui.Label("VICTORY", skin);
+
+        victoryTable.add(victoryLabel).padBottom(30).row();
+        victoryTable.add(restartBtn).width(200).height(50).pad(10).row();
+        victoryTable.add(exitBtn).width(200).height(50).pad(10);
+        victoryTable.setVisible(false);
+        stage.addActor(victoryTable);
+    }
+
     private void renderGameOverMenu(float delta) {
         gameOverTable.setVisible(true);
         pauseTable.setVisible(false);
+        if (victoryTable != null) victoryTable.setVisible(false);
+        Gdx.input.setInputProcessor(stage);
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        stage.act(delta);
+        stage.draw();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    private void renderVictoryMenu(float delta) {
+        if (victoryTable == null) return;
+        victoryTable.setVisible(true);
+        pauseTable.setVisible(false);
+        gameOverTable.setVisible(false);
         Gdx.input.setInputProcessor(stage);
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -742,6 +889,61 @@ public class MultiplayerGameScreen implements Screen {
             reviveDisplayTimer = Math.min(reviveDisplayTimer + delta, reviveTimeRequired);
         } else {
             reviveDisplayTimer = 0f;
+        }
+    }
+
+    private boolean isAttemptingRevive(Player helper, Player target, boolean isHolding) {
+        return isHolding
+            && !helper.isDowned()
+            && target.isDowned()
+            && helper.getPosition().dst(target.getPosition()) <= reviveRange;
+    }
+
+    private Generator findRepairTarget(Player player) {
+        Generator closest = null;
+        float bestDist = generatorRepairRange;
+        for (Generator generator : levelManager.getGenerators()) {
+            if (generator.isRepaired()) continue;
+            float dist = player.getPosition().dst(generator.getPosition());
+            if (dist <= bestDist) {
+                bestDist = dist;
+                closest = generator;
+            }
+        }
+        return closest;
+    }
+
+    private void updateGenerators(float delta, Generator localTarget, Generator remoteTarget) {
+        for (Generator generator : levelManager.getGenerators()) {
+            if (generator.isRepaired()) continue;
+            boolean repairing = generator == localTarget || generator == remoteTarget;
+            if (repairing) {
+                float next = generator.getRepairProgress() + delta;
+                if (next >= generatorRepairTime) {
+                    generator.setRepaired(true);
+                } else {
+                    generator.setRepairProgress(next);
+                }
+            } else {
+                generator.setRepairProgress(0f);
+            }
+        }
+
+        if (!levelManager.isExitUnlocked() && levelManager.areAllGeneratorsRepaired()) {
+            levelManager.setExitUnlocked(true);
+        }
+        if (levelManager.isExitUnlocked()) {
+            clearEnemiesInSafeZone();
+        }
+    }
+
+    private void clearEnemiesInSafeZone() {
+        if (levelManager.getExitZone() == null) return;
+        Rectangle bounds = levelManager.getExitZone().getBounds();
+        for (Enemy enemy : levelManager.getEnemies()) {
+            if (enemy.isActive() && bounds.contains(enemy.getPosition())) {
+                enemy.setActive(false);
+            }
         }
     }
 

@@ -169,7 +169,9 @@ public class StoneManager {
 
                 if (levelManager != null) {
                     for (ee.eotv.echoes.entities.Enemy enemy : levelManager.getEnemies()) {
-                        enemy.investigate(echoX, echoY);
+                        if (enemy.isActive()) {
+                            enemy.investigate(echoX, echoY);
+                        }
                     }
                 }
                 if (impactListener != null) {

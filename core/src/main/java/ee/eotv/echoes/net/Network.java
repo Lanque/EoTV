@@ -23,6 +23,8 @@ public class Network {
         kryo.register(NetMessages.ItemState[].class);
         kryo.register(NetMessages.DoorState.class);
         kryo.register(NetMessages.DoorState[].class);
+        kryo.register(NetMessages.GeneratorState.class);
+        kryo.register(NetMessages.GeneratorState[].class);
         kryo.register(NetMessages.EchoEvent.class);
         kryo.register(NetMessages.SoundEvent.class);
         kryo.register(NetMessages.SoundType.class);

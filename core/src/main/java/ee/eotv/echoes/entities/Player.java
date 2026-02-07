@@ -58,6 +58,7 @@ public class Player {
     private float stateTime;
     private boolean facingRight = true;
     private boolean isDowned = false;
+    private boolean isFrozen = false;
 
     // Hoiame nurka meeles, et uuendada valgust render tsüklis
     private float currentAngle = 0f;
@@ -192,6 +193,14 @@ public class Player {
     private void applyInput(PlayerInput input, float delta, SoundManager sm) {
         if (input == null) return;
 
+        if (isFrozen) {
+            input.up = false;
+            input.down = false;
+            input.left = false;
+            input.right = false;
+            input.wantsToRun = false;
+        }
+
         if (input.toggleLight && canUseFlashlight() && !isDowned) {
             isLightOn = !isLightOn;
             flashlight.setActive(isLightOn);
@@ -230,7 +239,11 @@ public class Player {
         if (input.down) vy = -currentSpeed;
         if (input.left) vx = -currentSpeed;
         if (input.right) vx = currentSpeed;
-        body.setLinearVelocity(vx, vy);
+        if (isFrozen) {
+            body.setLinearVelocity(0, 0);
+        } else {
+            body.setLinearVelocity(vx, vy);
+        }
 
         currentAngle = input.aimAngle;
     }
@@ -309,6 +322,13 @@ public class Player {
             isRunning = false;
             flashlight.setActive(false);
             isLightOn = false;
+        }
+    }
+
+    public void setFrozen(boolean frozen) {
+        isFrozen = frozen;
+        if (isFrozen) {
+            body.setLinearVelocity(0, 0);
         }
     }
 
