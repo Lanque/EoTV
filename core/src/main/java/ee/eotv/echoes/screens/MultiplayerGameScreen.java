@@ -32,6 +32,7 @@ import ee.eotv.echoes.net.NetMessages;
 import ee.eotv.echoes.net.NetworkClient;
 import ee.eotv.echoes.net.NetworkServer;
 import ee.eotv.echoes.ui.Hud;
+import ee.eotv.echoes.ui.WorldRenderer; // UUS IMPORT
 import ee.eotv.echoes.world.LevelManager;
 
 import java.util.Iterator;
@@ -45,6 +46,7 @@ public class MultiplayerGameScreen implements Screen {
     private final Player.Role localRole;
 
     private LevelManager levelManager;
+    private WorldRenderer worldRenderer; // UUS RENDERDAJA
     private Player localPlayer;
     private Player remotePlayer;
     private Player hostPlayer;
@@ -56,7 +58,6 @@ public class MultiplayerGameScreen implements Screen {
     private SoundManager soundManager;
     private Hud hud;
     private OrthographicCamera camera;
-    private ShapeRenderer trajectoryRenderer;
     private ShapeRenderer overlayRenderer;
 
     private Stage stage;
@@ -107,9 +108,11 @@ public class MultiplayerGameScreen implements Screen {
         camera.setToOrtho(false, 40, 30);
 
         levelManager = new LevelManager();
+        // Loome uue Renderdaja
+        worldRenderer = new WorldRenderer(game.batch, levelManager);
+
         soundManager = new SoundManager();
         hud = new Hud();
-        trajectoryRenderer = new ShapeRenderer();
         overlayRenderer = new ShapeRenderer();
         stage = new Stage(new ScreenViewport());
         skin = createBasicSkin();
@@ -179,120 +182,84 @@ public class MultiplayerGameScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        if (isGameOver) {
-            drawScene(delta);
-            renderGameOverMenu(delta);
-            return;
+        // --- 1. GAME LOOP LOOGIKA ---
+        if (!isGameOver && !isVictory && !isPaused) {
+            Gdx.input.setInputProcessor(null);
+            if (isHost) {
+                updateHost(delta);
+            } else {
+                updateClient(delta);
+            }
         }
-        if (isVictory) {
-            drawScene(delta);
-            renderVictoryMenu(delta);
-            return;
-        }
+
+        // --- 2. JÄRGMINE RIDA ON NÜÜD KOGU JOONISTAMINE ---
+        worldRenderer.render(camera, localPlayer, remotePlayer, stoneManager, isHost);
+
+        // --- 3. UI JA MENÜÜD ---
+        hud.render(localPlayer, camera);
+        renderRevivePrompt();
+        renderGeneratorPrompt();
 
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             togglePause();
         }
 
         if (isPaused) {
-            drawScene(delta);
             renderPauseMenu(delta);
-            return;
+        } else if (isGameOver) {
+            renderGameOverMenu(delta);
+        } else if (isVictory) {
+            renderVictoryMenu(delta);
         }
-
-        Gdx.input.setInputProcessor(null);
-
-        if (isHost) {
-            updateHost(delta);
-        } else {
-            updateClient(delta);
-        }
-
-        drawScene(delta);
     }
 
-    private void drawScene(float delta) {
-        camera.position.set(localPlayer.getPosition(), 0);
-        camera.update();
-
-        Gdx.gl.glClearColor(0, 0, 0, 1);
-        Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
-
-        levelManager.drawWorld(camera);
-        levelManager.drawItems(camera);
-        levelManager.drawDoors(camera);
-        levelManager.drawGenerators(camera);
-
-        game.batch.setProjectionMatrix(camera.combined);
-        game.batch.begin();
-        localPlayer.render(game.batch);
-        remotePlayer.render(game.batch);
-        for (Enemy enemy : levelManager.getEnemies()) {
-            enemy.render(game.batch);
-        }
-        game.batch.end();
-
-        levelManager.renderLights(camera);
-        if (isHost && stoneManager != null && localPlayer.canThrowStones()) {
-            stoneManager.renderTrajectory(localPlayer, camera);
-        } else {
-            renderTrajectory();
-        }
-        hud.render(localPlayer, camera);
-        if (localPlayer.isDowned()) {
-            renderDownedOverlay();
-        }
-        renderRevivePrompt();
-        renderGeneratorPrompt();
-    }
+    // --- LOGIC METHODS ---
 
     private void updateHost(float delta) {
-        if (!isGameOver && !isVictory) {
-            NetMessages.InputState remoteInput = server.getLatestInput(remotePlayerId);
-            boolean localHoldRepair = Gdx.input.isKeyPressed(Input.Keys.E);
-            boolean remoteHoldRepair = remoteInput != null && remoteInput.revive;
-            boolean localAttemptRevive = isAttemptingRevive(localPlayer, remotePlayer, localHoldRepair);
-            boolean remoteAttemptRevive = isAttemptingRevive(remotePlayer, localPlayer, remoteHoldRepair);
+        NetMessages.InputState remoteInput = server.getLatestInput(remotePlayerId);
+        boolean localHoldRepair = Gdx.input.isKeyPressed(Input.Keys.E);
+        boolean remoteHoldRepair = remoteInput != null && remoteInput.revive;
+        boolean localAttemptRevive = isAttemptingRevive(localPlayer, remotePlayer, localHoldRepair);
+        boolean remoteAttemptRevive = isAttemptingRevive(remotePlayer, localPlayer, remoteHoldRepair);
 
-            Generator localTarget = (!localPlayer.isDowned() && localHoldRepair && !localAttemptRevive)
-                ? findRepairTarget(localPlayer) : null;
-            Generator remoteTarget = (!remotePlayer.isDowned() && remoteHoldRepair && !remoteAttemptRevive)
-                ? findRepairTarget(remotePlayer) : null;
+        Generator localTarget = (!localPlayer.isDowned() && localHoldRepair && !localAttemptRevive)
+            ? findRepairTarget(localPlayer) : null;
+        Generator remoteTarget = (!remotePlayer.isDowned() && remoteHoldRepair && !remoteAttemptRevive)
+            ? findRepairTarget(remotePlayer) : null;
 
-            localPlayer.setFrozen(localTarget != null);
-            remotePlayer.setFrozen(remoteTarget != null);
+        localPlayer.setFrozen(localTarget != null);
+        remotePlayer.setFrozen(remoteTarget != null);
 
-            localPlayer.update(delta, levelManager, camera, soundManager);
+        localPlayer.update(delta, levelManager, camera, soundManager);
 
-            Player.PlayerInput converted = convertInput(remoteInput);
-            remotePlayer.updateFromInput(delta, converted, soundManager, levelManager);
+        Player.PlayerInput converted = convertInput(remoteInput);
+        remotePlayer.updateFromInput(delta, converted, soundManager, levelManager);
 
-            if (localPlayer.canThrowStones() && localTarget == null) {
-                stoneManager.handleInput(localPlayer, camera);
-            }
-
-            Queue<NetMessages.ThrowStone> throwQueue = server.getThrowQueue();
-            NetMessages.ThrowStone throwStone;
-            while ((throwStone = throwQueue.poll()) != null) {
-                if (throwStone.playerId == remotePlayerId && remoteTarget == null) {
-                    stoneManager.throwStoneFromNetwork(remotePlayer, throwStone.targetX, throwStone.targetY, throwStone.power);
-                }
-            }
-
-            levelManager.update(delta);
-            stoneManager.update(delta);
-
-            for (Enemy enemy : levelManager.getEnemies()) {
-                if (!enemy.isActive()) continue;
-                Player closest = getClosestPlayer(enemy);
-                enemy.update(closest, delta);
-            }
-
-            handleDownedState(delta, remoteInput);
-            updateGenerators(delta, localTarget, remoteTarget);
-            updateItemsAndDoors();
-            updateVictoryAndGameOver();
+        if (localPlayer.canThrowStones() && localTarget == null) {
+            stoneManager.handleInput(localPlayer, camera);
         }
+
+        Queue<NetMessages.ThrowStone> throwQueue = server.getThrowQueue();
+        NetMessages.ThrowStone throwStone;
+        while ((throwStone = throwQueue.poll()) != null) {
+            if (throwStone.playerId == remotePlayerId && remoteTarget == null) {
+                stoneManager.throwStoneFromNetwork(remotePlayer, throwStone.targetX, throwStone.targetY, throwStone.power);
+            }
+        }
+
+        levelManager.update(delta);
+        stoneManager.update(delta);
+
+        for (Enemy enemy : levelManager.getEnemies()) {
+            if (!enemy.isActive()) continue;
+            Player closest = getClosestPlayer(enemy);
+            enemy.update(closest, delta);
+        }
+
+        handleDownedState(delta, remoteInput);
+        updateGenerators(delta, localTarget, remoteTarget);
+        updateItemsAndDoors();
+        updateVictoryAndGameOver();
 
         updateReviveDisplayTimer(delta, Gdx.input.isKeyPressed(Input.Keys.E));
         sendWorldState();
@@ -572,41 +539,6 @@ public class MultiplayerGameScreen implements Screen {
         return role == Player.Role.FLASHLIGHT ? Player.Role.STONES : Player.Role.FLASHLIGHT;
     }
 
-    private void renderTrajectory() {
-        if (!isCharging || localRole != Player.Role.STONES) return;
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-
-        Vector2 startPos = localPlayer.getPosition();
-        Vector3 mouse = new Vector3(Gdx.input.getX(), Gdx.input.getY(), 0);
-        camera.unproject(mouse);
-        Vector2 dir = new Vector2(mouse.x - startPos.x, mouse.y - startPos.y).nor();
-
-        float distance = (currentPower / 0.0628f) * 0.6f;
-
-        trajectoryRenderer.setProjectionMatrix(camera.combined);
-        trajectoryRenderer.begin(ShapeRenderer.ShapeType.Filled);
-
-        int dots = 12;
-        for (int i = 1; i <= dots; i++) {
-            float step = (distance / dots) * i;
-            float dotX = startPos.x + dir.x * (step + 0.7f);
-            float dotY = startPos.y + dir.y * (step + 0.7f);
-
-            float alpha = 1.0f - ((float)i / dots) * 0.5f;
-            trajectoryRenderer.setColor(0.4f, 0.8f, 1f, alpha);
-            float size = 0.12f - (i * 0.005f);
-            trajectoryRenderer.circle(dotX, dotY, size, 8);
-        }
-
-        trajectoryRenderer.setColor(1, 1, 1, 0.8f);
-        trajectoryRenderer.circle(startPos.x + dir.x * (distance + 0.7f), startPos.y + dir.y * (distance + 0.7f), 0.15f, 10);
-
-        trajectoryRenderer.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
-    }
-
     private void handleDownedState(float delta, NetMessages.InputState remoteInput) {
         for (Enemy enemy : levelManager.getEnemies()) {
             if (!localPlayer.isDowned() && enemy.getPosition().dst(localPlayer.getPosition()) < 0.85f) {
@@ -637,22 +569,6 @@ public class MultiplayerGameScreen implements Screen {
             timer = 0f;
         }
         return timer;
-    }
-
-    private void renderDownedOverlay() {
-        float viewWidth = camera.viewportWidth * camera.zoom;
-        float viewHeight = camera.viewportHeight * camera.zoom;
-        float startX = camera.position.x - viewWidth / 2f;
-        float startY = camera.position.y - viewHeight / 2f;
-
-        Gdx.gl.glEnable(GL20.GL_BLEND);
-        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
-        overlayRenderer.setProjectionMatrix(camera.combined);
-        overlayRenderer.begin(ShapeRenderer.ShapeType.Filled);
-        overlayRenderer.setColor(0.6f, 0.0f, 0.0f, 0.35f);
-        overlayRenderer.rect(startX, startY, viewWidth, viewHeight);
-        overlayRenderer.end();
-        Gdx.gl.glDisable(GL20.GL_BLEND);
     }
 
     private void renderRevivePrompt() {
@@ -1043,7 +959,6 @@ public class MultiplayerGameScreen implements Screen {
 
     @Override
     public void dispose() {
-        if (trajectoryRenderer != null) trajectoryRenderer.dispose();
         if (overlayRenderer != null) overlayRenderer.dispose();
         levelManager.dispose();
         hud.dispose();
@@ -1055,5 +970,6 @@ public class MultiplayerGameScreen implements Screen {
         if (overlayFont != null) overlayFont.dispose();
         if (server != null) server.stop();
         if (client != null) client.stop();
+        if (worldRenderer != null) worldRenderer.dispose(); // UUS DISPOSE
     }
 }
