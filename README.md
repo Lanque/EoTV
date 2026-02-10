@@ -1,93 +1,103 @@
-# iti0301-2026_EOTV
+# ITI0301-2026
+
+## Echoes of the Void
+
+### Game description:
+
+**Echoes of the Void** is a 2D top-down cooperative survival horror game for two players. Players find themselves trapped in a dark, abandoned facility infested with light-sensitive monsters.
+
+The objective is to escape the facility by finding and repairing broken electrical generators. Repairing them restores power to the security doors, unlocking the **Exit Zone**. Survival depends on teamwork—players must choose between roles (Flashlight or Stones), manage their stamina, and cover each other while performing tasks.
+
+The game features an asymmetric information system: lighting is limited, and enemies can hear footsteps and impacts.
+
+### Keybinds:
+
+| Key | Action |
+| --- | --- |
+| **W, A, S, D** | Move the character |
+| **Shift** (Hold) | Run (consumes Stamina) |
+| **Mouse Cursor** | Aim / Look direction |
+| **F** or **Space** | Toggle Flashlight (Flashlight role only) |
+| **E** (Hold) | Repair Generator / Revive Teammate |
+| **Left Mouse Button** | Throw Stone (Stones role only) |
+| **ESC** | Open Pause Menu |
+
+### How to Play:
+
+1. **Launch the Game:** Open the application.
+2. **Multiplayer Menu:** Select "Multiplayer" from the main menu.
+3. **Choose Roles:**
+* **Flashlight:** Has a cone of light to see in the dark and reveal enemies.
+* **Stones:** Can throw stones to distract enemies or trigger echoes to see surroundings.
+
+
+4. **Host/Join:** One player acts as the **Host** (Server), the other joins as a **Client** using the Host's IP address.
+5. **Objective:** Locate red generators on the map. Hold **E** to repair them. The other player must defend the repairer.
+6. **Win Condition:** Once all generators are fixed, the **Exit Zone** (Green area) unlocks. Both players must stand in the zone to win.
+7. **Revive:** If a player is attacked, they enter a "Downed" state. The other player must revive them by holding **E**.
+
+### Installation and Starting the Game:
+
+Since the project uses a single JAR for both Host and Client logic, the installation process is unified.
+
+#### 1. Build the Project
+
+* Clone this repository.
+* Open a terminal in the project root directory.
+* Run the Gradle build command:
+* **Windows:** `.\gradlew lwjgl3:dist`
+* **Mac/Linux:** `./gradlew lwjgl3:dist`
 
 
 
-## Getting started
+#### 2. Run the Game
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+* Navigate to the build directory: `lwjgl3/build/libs/`
+* Run the JAR file:
+```bash
+java -jar lwjgl3-1.0.0.jar
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.cs.taltech.ee/gregoa/iti0301-2026_eotv.git
-git branch -M main
-git push -uf origin main
-```
 
-## Integrate with your tools
 
-- [ ] [Set up project integrations](https://gitlab.cs.taltech.ee/gregoa/iti0301-2026_eotv/-/settings/integrations)
+*(Note: Ensure the `assets` folder is accessible relative to the JAR file).*
 
-## Collaborate with your team
+### Technologies Used:
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+* **Java 21** - Programming language
+* **LibGDX 1.13.1** - Game development framework
+* **KryoNet 2.22** - Network communication (TCP/UDP)
+* **Box2D** - Physics simulation and collision detection
+* **Box2DLights 1.5** - Dynamic lighting and shadows
+* **Gradle 8.x** - Build automation tool
 
-## Test and Deploy
+### Features:
 
-Use the built-in continuous integration in GitLab.
+| Feature | Description |
+| --- | --- |
+| **Co-op Multiplayer** | Real-time 2-player gameplay over LAN/Internet. |
+| **AI Enemies** | Zombies patrol the map, investigate noises, and chase players upon visual contact. |
+| **Dynamic Lighting** | Raycasting light system. Shadows hide enemies and objects. |
+| **Sound Propagation** | Sounds (steps, throws) travel based on distance and attract AI. |
+| **Generator System** | Synchronized repair mechanics required to unlock the exit. |
+| **Revive System** | Players are not eliminated instantly but can be revived by teammates. |
+| **Physics Interaction** | Stone throwing mechanics with trajectories and wall bouncing. |
+| **Save/Load System** | Local game state saving for single-player practice. |
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+### Authors:
 
-***
+* Gregor Aab
+* Alex-Christian Jõgiste
+* Egert Kelder
 
-# Editing this README
+### Connecting the Client to TalTech Server:
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+This game operates on a **Host-Client (Peer-to-Peer)** architecture.
 
-## Suggestions for a good README
+* **To Play:** One student runs the game and clicks **HOST**.
+* **To Connect:** The second student runs the game, enters the Host's IP address (e.g., `192.168.1.X` or `127.0.0.1` if testing locally), and clicks **JOIN**.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+*If a dedicated headless server is required for grading:*
 
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+1. Run the server-specific JAR (if generated via `server:dist`).
+2. Clients connect to the server's IP on TCP port **54555** and UDP port **54777**.
