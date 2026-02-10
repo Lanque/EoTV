@@ -52,6 +52,7 @@ public class GameScreen implements Screen {
 
     // --- MENÜÜD ---
     private boolean isPaused = false;
+    private boolean debugDisableLighting = false;
     private boolean isVictory = false;
     private boolean isGameOverState = false;
 
@@ -104,6 +105,10 @@ public class GameScreen implements Screen {
     public void render(float delta) {
         if (!isVictory && !isGameOverState && Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             togglePause();
+        }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.L)) {
+            debugDisableLighting = !debugDisableLighting;
+            levelManager.setLightingEnabled(!debugDisableLighting);
         }
 
         // --- 1. GAME LOOP (LOOGIKA) ---
@@ -441,3 +446,5 @@ public class GameScreen implements Screen {
         }
     }
 }
+
+

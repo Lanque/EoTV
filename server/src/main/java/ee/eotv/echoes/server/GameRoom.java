@@ -147,12 +147,12 @@ public class GameRoom {
 
         NetMessages.StartGame msg1 = new NetMessages.StartGame();
         msg1.playerId = HOST_ID;
-        msg1.role = hostRole;
+        msg1.role = Player.toNetRole(hostRole);
         hostConnection.sendTCP(msg1);
 
         NetMessages.StartGame msg2 = new NetMessages.StartGame();
         msg2.playerId = GUEST_ID;
-        msg2.role = guestRole;
+        msg2.role = Player.toNetRole(guestRole);
         guestConnection.sendTCP(msg2);
 
         System.out.println("Room " + id + ": Game started.");
@@ -423,7 +423,7 @@ public class GameRoom {
             NetMessages.ItemState is = new NetMessages.ItemState();
             is.x = item.getPosition().x;
             is.y = item.getPosition().y;
-            is.type = item.getType();
+            is.type = Item.toNetType(item.getType());
             state.items[i] = is;
         }
 
@@ -470,7 +470,7 @@ public class GameRoom {
         ps.ammo = player.ammo;
         ps.hasKeycard = player.hasKeycard;
         ps.aimAngle = player.getAimAngle();
-        ps.role = player.getRole();
+        ps.role = Player.toNetRole(player.getRole());
         ps.downed = player.isDowned();
         return ps;
     }
@@ -515,10 +515,10 @@ public class GameRoom {
     }
 
     private void sendEchoForStep(Player player) {
-        float radius = player.isRunning ? 32f : 18f;
+        float radius = player.isRunning ? 24f : 18f;
         Color color = player.isRunning
-            ? new Color(0.5f, 0.7f, 1f, 0.5f)
-            : new Color(0.4f, 0.5f, 0.8f, 0.5f);
+            ? new Color(0.5f, 0.7f, 1f, 0.7f)
+            : new Color(0.4f, 0.5f, 0.8f, 0.65f);
         sendEchoEvent(player.getPosition().x, player.getPosition().y, radius, color);
     }
 

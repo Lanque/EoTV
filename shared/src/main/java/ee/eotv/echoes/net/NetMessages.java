@@ -1,8 +1,5 @@
 package ee.eotv.echoes.net;
 
-import ee.eotv.echoes.entities.Item;
-import ee.eotv.echoes.entities.Player;
-
 public class NetMessages {
     public enum SoundType {
         STEP,
@@ -14,24 +11,34 @@ public class NetMessages {
         LIGHT_OFF
     }
 
+    public enum Role {
+        FLASHLIGHT,
+        STONES
+    }
+
+    public enum ItemType {
+        STONE,
+        KEYCARD
+    }
+
     public static class JoinRequest {
-        public Player.Role role;
+        public Role role;
     }
 
     public static class JoinResponse {
         public boolean accepted;
         public String message;
         public int playerId;
-        public Player.Role role;
+        public Role role;
     }
 
     public static class CreateLobbyRequest {
-        public Player.Role preferredRole;
+        public Role preferredRole;
     }
 
     public static class JoinLobbyRequest {
         public int lobbyId;
-        public Player.Role preferredRole;
+        public Role preferredRole;
     }
 
     public static class LobbyJoinedResponse {
@@ -43,7 +50,7 @@ public class NetMessages {
 
     public static class StartGame {
         public int playerId;
-        public Player.Role role;
+        public Role role;
     }
 
     public static class InputState {
@@ -90,7 +97,7 @@ public class NetMessages {
         public int ammo;
         public boolean hasKeycard;
         public float aimAngle;
-        public Player.Role role;
+        public Role role;
         public boolean downed;
     }
 
@@ -107,7 +114,7 @@ public class NetMessages {
     public static class ItemState {
         public float x;
         public float y;
-        public Item.Type type;
+        public ItemType type;
     }
 
     public static class DoorState {

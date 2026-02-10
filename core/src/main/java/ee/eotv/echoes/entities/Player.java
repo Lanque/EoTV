@@ -16,8 +16,10 @@ import box2dLight.ConeLight;
 import box2dLight.RayHandler;
 import ee.eotv.echoes.world.LevelManager;
 import ee.eotv.echoes.managers.SoundManager;
+import ee.eotv.echoes.net.NetMessages;
 
 public class Player {
+    public static final short CATEGORY_PLAYER = 0x0002;
     public interface ActionListener {
         void onStep(Player player);
         void onLightToggle(Player player, boolean lightOn);
@@ -29,8 +31,21 @@ public class Player {
         STONES
     }
 
+    public static NetMessages.Role toNetRole(Role roleValue) {
+        if (roleValue == null) return NetMessages.Role.FLASHLIGHT;
+        if (roleValue == Role.STONES) return NetMessages.Role.STONES;
+        return NetMessages.Role.FLASHLIGHT;
+    }
+
+    public static Role fromNetRole(NetMessages.Role roleValue) {
+        if (roleValue == null) return Role.FLASHLIGHT;
+        if (roleValue == NetMessages.Role.STONES) return Role.STONES;
+        return Role.FLASHLIGHT;
+    }
+
     private Body body;
     private ConeLight flashlight;
+    private RayHandler rayHandler;
 
     private float walkSpeed = 4.0f;
     private float runSpeed = 8.0f;
@@ -59,11 +74,16 @@ public class Player {
     private boolean facingRight = true;
     private boolean isDowned = false;
     private boolean isFrozen = false;
+    private float flashlightDistance = 45f;
+    private int flashlightRays = 200;
+    private float flashlightCone = 35f;
+    private Color flashlightColor = new Color(1f, 1f, 0.9f, 1f);
 
     // Hoiame nurka meeles, et uuendada valgust render tsüklis
     private float currentAngle = 0f;
 
     public Player(World world, RayHandler rayHandler, float x, float y) {
+        this.rayHandler = rayHandler;
         BodyDef bodyDef = new BodyDef();
         bodyDef.type = BodyDef.BodyType.DynamicBody;
         bodyDef.position.set(x, y);
@@ -73,15 +93,15 @@ public class Player {
 
         CircleShape shape = new CircleShape();
         shape.setRadius(0.4f);
-        body.createFixture(shape, 1.0f);
+        Fixture fixture = body.createFixture(shape, 1.0f);
+        Filter filter = fixture.getFilterData();
+        filter.categoryBits = CATEGORY_PLAYER;
+        fixture.setFilterData(filter);
         shape.dispose();
 
         // VALGUS: Ei kinnita enam kehale (attachToBody puudub), et saaksime ise suunda ja asukohta määrata
         if (rayHandler != null) {
-            flashlight = new ConeLight(rayHandler, 200, new Color(1f, 1f, 0.9f, 1f), 45f, x, y, 0, 35f);
-            flashlight.setSoft(true);
-        } else {
-            flashlight = null;
+            createFlashlight(x, y);
         }
 
         // --- TEXTURE/ANIMATION (skip in headless) ---
@@ -116,6 +136,12 @@ public class Player {
 
     public void render(SpriteBatch batch) {
         if (texture == null || runAnimation == null || idleFrame == null) return;
+        if (!isLightOn && flashlight != null) {
+            flashlight.remove();
+            flashlight = null;
+        } else if (isLightOn && flashlight == null && rayHandler != null) {
+            createFlashlight(body.getPosition().x, body.getPosition().y);
+        }
         stateTime += Gdx.graphics.getDeltaTime();
 
         // 1. Uuendame taskulambi asukohta ja suunda käsitsi
@@ -208,10 +234,7 @@ public class Player {
         }
 
         if (input.toggleLight && canUseFlashlight() && !isDowned) {
-            isLightOn = !isLightOn;
-            if (flashlight != null) {
-                flashlight.setActive(isLightOn);
-            }
+            setLightOn(!isLightOn);
             if (actionListener != null) {
                 actionListener.onLightToggle(this, isLightOn);
             } else if (sm != null) {
@@ -268,8 +291,8 @@ public class Player {
             if (stepTimer >= currentInterval) {
                 float echoRadius = isRunning ? 32f : 18f;
                 Color echoColor = isRunning ?
-                    new Color(0.5f, 0.7f, 1f, 0.5f) :
-                    new Color(0.4f, 0.5f, 0.8f, 0.5f);
+                    new Color(0.5f, 0.7f, 1f, 0.65f) :
+                    new Color(0.4f, 0.5f, 0.8f, 0.6f);
 
                 if (lm != null) {
                     lm.addEcho(body.getPosition().x, body.getPosition().y, echoRadius, echoColor);
@@ -290,6 +313,24 @@ public class Player {
 
     public float getAimAngle() { return currentAngle; }
 
+    public void setAimAngle(float angle) {
+        currentAngle = angle;
+    }
+
+    public void setLightOn(boolean lightOn) {
+        isLightOn = lightOn && canUseFlashlight();
+        if (!isLightOn) {
+            if (flashlight != null) {
+                flashlight.remove();
+                flashlight = null;
+            }
+            return;
+        }
+        if (flashlight == null && rayHandler != null) {
+            createFlashlight(body.getPosition().x, body.getPosition().y);
+        }
+    }
+
     public void setPosition(float x, float y) {
         body.setTransform(x, y, body.getAngle());
         if (flashlight != null) {
@@ -302,10 +343,7 @@ public class Player {
                                 float aimAngle, Role roleValue, boolean downed) {
         body.setTransform(x, y, body.getAngle());
         body.setLinearVelocity(vx, vy);
-        isLightOn = lightOn && canUseFlashlight(roleValue);
-        if (flashlight != null) {
-            flashlight.setActive(isLightOn);
-        }
+        setLightOn(lightOn && canUseFlashlight(roleValue));
         isRunning = running;
         isMoving = moving;
         stamina = staminaValue;
@@ -323,10 +361,7 @@ public class Player {
     public void setRole(Role role) {
         this.role = role;
         if (!canUseFlashlight()) {
-            isLightOn = false;
-            if (flashlight != null) {
-                flashlight.setActive(false);
-            }
+            setLightOn(false);
         }
     }
 
@@ -336,10 +371,7 @@ public class Player {
         isDowned = downed;
         if (isDowned) {
             isRunning = false;
-            if (flashlight != null) {
-                flashlight.setActive(false);
-            }
-            isLightOn = false;
+            setLightOn(false);
         }
     }
 
@@ -373,10 +405,17 @@ public class Player {
     }
 
     public void dispose() {
+        if (flashlight != null) {
+            flashlight.remove();
+            flashlight = null;
+        }
         if (texture != null) texture.dispose();
     }
+
+    private void createFlashlight(float x, float y) {
+        flashlight = new ConeLight(rayHandler, flashlightRays, flashlightColor, flashlightDistance, x, y, currentAngle, flashlightCone);
+        flashlight.setSoft(true);
+    }
 }
-
-
 
 

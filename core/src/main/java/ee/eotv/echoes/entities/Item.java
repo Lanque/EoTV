@@ -3,11 +3,22 @@ package ee.eotv.echoes.entities;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
+import ee.eotv.echoes.net.NetMessages;
 
 public class Item {
     public enum Type {
         STONE,      // Visatav kivi
         KEYCARD     // Uksekaart
+    }
+
+    public static NetMessages.ItemType toNetType(Type type) {
+        if (type == null) return NetMessages.ItemType.STONE;
+        return type == Type.KEYCARD ? NetMessages.ItemType.KEYCARD : NetMessages.ItemType.STONE;
+    }
+
+    public static Type fromNetType(NetMessages.ItemType type) {
+        if (type == null) return Type.STONE;
+        return type == NetMessages.ItemType.KEYCARD ? Type.KEYCARD : Type.STONE;
     }
 
     private Vector2 position;

@@ -52,7 +52,7 @@ public class WorldRenderer {
         batch.end();
 
         // 5. Joonista valgus (RayHandler)
-        if (levelManager.rayHandler != null) {
+        if (levelManager.isLightingEnabled()) {
             levelManager.rayHandler.setCombinedMatrix(camera.combined, camera.position.x, camera.position.y,
                 camera.viewportWidth * camera.zoom, camera.viewportHeight * camera.zoom);
             levelManager.rayHandler.updateAndRender();

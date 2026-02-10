@@ -77,14 +77,14 @@ public class NetworkClient {
 
     public void createLobby(Player.Role preferredRole) {
         NetMessages.CreateLobbyRequest req = new NetMessages.CreateLobbyRequest();
-        req.preferredRole = preferredRole;
+        req.preferredRole = Player.toNetRole(preferredRole);
         client.sendTCP(req);
     }
 
     public void joinLobby(int lobbyId, Player.Role preferredRole) {
         NetMessages.JoinLobbyRequest req = new NetMessages.JoinLobbyRequest();
         req.lobbyId = lobbyId;
-        req.preferredRole = preferredRole;
+        req.preferredRole = Player.toNetRole(preferredRole);
         client.sendTCP(req);
     }
 

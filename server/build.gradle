@@ -29,6 +29,7 @@ dependencies {
 
   // Core (jagatud kood)
   implementation project(':core')
+  implementation project(':shared')
 }
 
 // Serveri käivitamise seadistus

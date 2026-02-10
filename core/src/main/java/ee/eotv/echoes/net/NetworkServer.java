@@ -68,7 +68,7 @@ public class NetworkServer {
             return;
         }
 
-        if (request.role == hostRole) {
+        if (request.role != null && Player.fromNetRole(request.role) == hostRole) {
             response.accepted = false;
             response.message = "Role already taken.";
             connection.sendTCP(response);
@@ -76,7 +76,7 @@ public class NetworkServer {
         }
 
         clientConnection = connection;
-        clientRole = request.role;
+        clientRole = Player.fromNetRole(request.role);
 
         response.accepted = true;
         response.playerId = CLIENT_ID;
@@ -86,7 +86,7 @@ public class NetworkServer {
 
         NetMessages.StartGame startGame = new NetMessages.StartGame();
         startGame.playerId = CLIENT_ID;
-        startGame.role = request.role;
+        startGame.role = Player.toNetRole(clientRole);
         connection.sendTCP(startGame);
         gameStarted = true;
     }

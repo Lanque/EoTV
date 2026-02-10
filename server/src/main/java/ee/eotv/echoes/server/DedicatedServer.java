@@ -6,6 +6,7 @@ import com.badlogic.gdx.backends.headless.HeadlessApplicationConfiguration;
 import com.esotericsoftware.kryonet.Connection;
 import com.esotericsoftware.kryonet.Listener;
 import com.esotericsoftware.kryonet.Server;
+import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.net.NetMessages;
 import ee.eotv.echoes.net.Network;
 
@@ -69,7 +70,8 @@ public class DedicatedServer extends ApplicationAdapter {
     }
 
     private void handleCreateLobby(Connection connection, NetMessages.CreateLobbyRequest req) {
-        GameRoom room = new GameRoom(nextRoomId++, connection, req.preferredRole);
+        Player.Role preferredRole = req.preferredRole == null ? null : Player.fromNetRole(req.preferredRole);
+        GameRoom room = new GameRoom(nextRoomId++, connection, preferredRole);
         rooms.put(room.id, room);
         playerToRoomMap.put(connection.getID(), room.id);
 
@@ -92,7 +94,8 @@ public class DedicatedServer extends ApplicationAdapter {
             return;
         }
 
-        boolean success = room.join(connection, req.preferredRole);
+        Player.Role joinRole = req.preferredRole == null ? null : Player.fromNetRole(req.preferredRole);
+        boolean success = room.join(connection, joinRole);
         if (success) {
             playerToRoomMap.put(connection.getID(), room.id);
         }

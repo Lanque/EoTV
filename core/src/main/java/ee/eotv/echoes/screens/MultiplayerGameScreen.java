@@ -23,6 +23,7 @@ import com.badlogic.gdx.utils.TimeUtils;
 import ee.eotv.echoes.Main;
 import ee.eotv.echoes.entities.Door;
 import ee.eotv.echoes.entities.Generator;
+import ee.eotv.echoes.entities.Item;
 import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.managers.SoundManager;
 import ee.eotv.echoes.managers.StoneManager;
@@ -77,15 +78,18 @@ public class MultiplayerGameScreen implements Screen {
 
     private boolean isGameOver = false;
     private boolean isVictory = false;
+    private boolean debugDisableLighting = false;
 
     private NetMessages.WorldState previousState;
     private NetMessages.WorldState currentState;
     private long previousStateTimeMs;
     private long currentStateTimeMs;
+    private boolean pendingLocalToggle = false;
+    private float lastLocalAimAngle = 0f;
     public MultiplayerGameScreen(Main game, NetworkClient client, NetMessages.StartGame startGame) {
         this.game = game;
         this.client = client;
-        this.localRole = startGame.role;
+        this.localRole = Player.fromNetRole(startGame.role);
         this.localPlayerId = startGame.playerId;
         this.remotePlayerId = startGame.playerId == 1 ? 2 : 1;
         init();
@@ -157,6 +161,10 @@ public class MultiplayerGameScreen implements Screen {
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             togglePause();
         }
+        if (Gdx.input.isKeyJustPressed(Input.Keys.L)) {
+            debugDisableLighting = !debugDisableLighting;
+            levelManager.setLightingEnabled(!debugDisableLighting);
+        }
 
         if (isPaused) {
             renderPauseMenu(delta);
@@ -176,6 +184,7 @@ public class MultiplayerGameScreen implements Screen {
         }
         handleClientInput();
         applyWorldState();
+        applyLocalVisuals();
         levelManager.updateClient(delta);
         handleEchoEvents();
         handleSoundEvents();
@@ -199,11 +208,16 @@ public class MultiplayerGameScreen implements Screen {
         camera.unproject(mouse);
         float angleRad = (float) Math.atan2(mouse.y - localPlayer.getPosition().y, mouse.x - localPlayer.getPosition().x);
         input.aimAngle = (float) Math.toDegrees(angleRad);
+        lastLocalAimAngle = input.aimAngle;
         client.sendInput(input);
 
         boolean isHoldingRepair = input.revive;
         boolean isReviving = isAttemptingRevive(localPlayer, remotePlayer, isHoldingRepair);
         boolean isRepairing = !isReviving && !localPlayer.isDowned() && isHoldingRepair && findRepairTarget(localPlayer) != null;
+
+        if (input.toggleLight) {
+            pendingLocalToggle = true;
+        }
 
         if (localRole == Player.Role.STONES && !isRepairing) {
             if (Gdx.input.isButtonPressed(Input.Buttons.LEFT) && localPlayer.ammo > 0) {
@@ -252,7 +266,7 @@ public class MultiplayerGameScreen implements Screen {
         if (currentState.items != null) {
             for (NetMessages.ItemState is : currentState.items) {
                 if (is != null) {
-                    levelManager.spawnItem(is.type, is.x, is.y);
+                    levelManager.spawnItem(Item.fromNetType(is.type), is.x, is.y);
                 }
             }
         }
@@ -285,13 +299,23 @@ public class MultiplayerGameScreen implements Screen {
         isVictory = currentState.victory;
     }
 
+    private void applyLocalVisuals() {
+        if (localPlayer == null) return;
+        localPlayer.setAimAngle(lastLocalAimAngle);
+        if (pendingLocalToggle && !localPlayer.isDowned() && localPlayer.canUseFlashlight()) {
+            localPlayer.setLightOn(!localPlayer.isLightOn);
+        }
+        pendingLocalToggle = false;
+    }
+
     private void applyInterpolatedPlayers(float alpha) {
         NetMessages.PlayerState currentLocal = findPlayerState(currentState, localPlayerId);
         NetMessages.PlayerState currentRemote = findPlayerState(currentState, remotePlayerId);
         NetMessages.PlayerState previousLocal = previousState == null ? null : findPlayerState(previousState, localPlayerId);
         NetMessages.PlayerState previousRemote = previousState == null ? null : findPlayerState(previousState, remotePlayerId);
 
-        applyPlayerState(localPlayer, currentLocal, previousLocal, alpha);
+        // Local player uses latest state to avoid visible input lag (flashlight/position).
+        applyPlayerState(localPlayer, currentLocal, null, 1f);
         applyPlayerState(remotePlayer, currentRemote, previousRemote, alpha);
     }
 
@@ -307,8 +331,9 @@ public class MultiplayerGameScreen implements Screen {
             vx = lerp(previous.vx, current.vx, alpha);
             vy = lerp(previous.vy, current.vy, alpha);
         }
+        Player.Role roleValue = current.role == null ? null : Player.fromNetRole(current.role);
         target.setNetworkState(x, y, vx, vy, current.lightOn, current.running, current.moving,
-            current.stamina, current.ammo, current.hasKeycard, current.aimAngle, current.role, current.downed);
+            current.stamina, current.ammo, current.hasKeycard, current.aimAngle, roleValue, current.downed);
     }
 
     private void applyInterpolatedEnemies(float alpha) {

@@ -11,6 +11,7 @@ import ee.eotv.echoes.entities.Enemy;
 import ee.eotv.echoes.entities.Door;
 import ee.eotv.echoes.entities.ExitZone;
 import ee.eotv.echoes.entities.Generator;
+import ee.eotv.echoes.entities.Player;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -20,6 +21,7 @@ public class LevelManager {
     public RayHandler rayHandler;
     public WorldContactListener contactListener;
     private ArrayList<PointLight> activeEchoes = new ArrayList<>();
+    private boolean lightingEnabled = true;
 
     // Nimekirjad objektidest
     private ArrayList<Item> items = new ArrayList<>();
@@ -73,6 +75,7 @@ public class LevelManager {
         contactListener = new WorldContactListener();
         world.setContactListener(contactListener);
 
+        lightingEnabled = enableLighting;
         if (enableLighting) {
             rayHandler = new RayHandler(world);
             rayHandler.setAmbientLight(0f, 0f, 0f, 0f);
@@ -215,9 +218,13 @@ public class LevelManager {
     }
 
     public void addEcho(float x, float y, float radius, Color color) {
-        if (rayHandler == null) return;
-        PointLight echo = new PointLight(rayHandler, 64, color, radius, x, y);
+        if (rayHandler == null || !lightingEnabled) return;
+        Color adjusted = new Color(color);
+        adjusted.a *= 0.6f;
+        PointLight echo = new PointLight(rayHandler, 64, adjusted, radius, x, y);
+        echo.setContactFilter((short) 0x0001, (short) 0, (short) ~Player.CATEGORY_PLAYER);
         echo.setSoft(true);
+        echo.setXray(false);
         activeEchoes.add(echo);
     }
 
@@ -248,5 +255,13 @@ public class LevelManager {
         if (rayHandler != null) {
             rayHandler.dispose();
         }
+    }
+
+    public boolean isLightingEnabled() {
+        return lightingEnabled && rayHandler != null;
+    }
+
+    public void setLightingEnabled(boolean enabled) {
+        lightingEnabled = enabled;
     }
 }
