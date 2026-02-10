@@ -1,0 +1,47 @@
+plugins {
+  id "application"
+  id "eclipse"
+}
+
+// Lisame assets kausta, et server leiaks kaardi üles
+sourceSets.main.resources.srcDirs += [ rootProject.file('assets').path ]
+
+application.mainClass = 'ee.eotv.echoes.server.ServerLauncher'
+eclipse.project.name = appName + '-server'
+
+java.sourceCompatibility = 8
+java.targetCompatibility = 8
+if (JavaVersion.current().isJava9Compatible()) {
+  compileJava.options.release.set(8)
+}
+
+dependencies {
+  // Headless backend (ilma graafikata serveri jooksutamiseks)
+  implementation "com.badlogicgames.gdx:gdx-backend-headless:$gdxVersion"
+  implementation "com.badlogicgames.gdx:gdx-platform:$gdxVersion:natives-desktop"
+
+  // Füüsika (Box2D)
+  implementation "com.badlogicgames.gdx:gdx-box2d:$gdxVersion"
+  implementation "com.badlogicgames.gdx:gdx-box2d-platform:$gdxVersion:natives-desktop"
+
+  // Võrk (Asendasin muutuja $kryoNetVersion konkreetse numbriga)
+  implementation "com.esotericsoftware:kryonet:2.22.0-RC1"
+
+  // Core (jagatud kood)
+  implementation project(':core')
+}
+
+// Serveri käivitamise seadistus
+run {
+  workingDir = rootProject.file('assets').path
+}
+
+// JAR faili seadistus
+jar {
+  archiveFileName.set("${appName}-server.jar")
+  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+  from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+  manifest {
+    attributes 'Main-Class': application.mainClass
+  }
+}

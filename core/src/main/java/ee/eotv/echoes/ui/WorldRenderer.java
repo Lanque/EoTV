@@ -20,7 +20,7 @@ public class WorldRenderer {
         this.shapeRenderer = new ShapeRenderer();
     }
 
-    public void render(OrthographicCamera camera, Player localPlayer, Player remotePlayer, StoneManager stoneManager, boolean isHost) {
+    public void render(OrthographicCamera camera, Player localPlayer, Player remotePlayer, StoneManager stoneManager, boolean showTrajectory) {
         // 1. Puhasta ekraan
         Gdx.gl.glClearColor(0, 0, 0, 1);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
@@ -52,11 +52,14 @@ public class WorldRenderer {
         batch.end();
 
         // 5. Joonista valgus (RayHandler)
-        levelManager.rayHandler.setCombinedMatrix(camera.combined, camera.position.x, camera.position.y, camera.viewportWidth * camera.zoom, camera.viewportHeight * camera.zoom);
-        levelManager.rayHandler.updateAndRender();
+        if (levelManager.rayHandler != null) {
+            levelManager.rayHandler.setCombinedMatrix(camera.combined, camera.position.x, camera.position.y,
+                camera.viewportWidth * camera.zoom, camera.viewportHeight * camera.zoom);
+            levelManager.rayHandler.updateAndRender();
+        }
 
         // 6. Joonista kivi visketrajektoor (kui on kivi roll)
-        if (isHost && stoneManager != null && localPlayer.canThrowStones()) {
+        if (showTrajectory && stoneManager != null && localPlayer.canThrowStones()) {
             stoneManager.renderTrajectory(localPlayer, camera);
         }
 

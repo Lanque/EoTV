@@ -47,7 +47,6 @@ public class StoneManager {
         this.world = world;
         this.levelManager = lm;
         this.soundManager = sm;
-        this.shapeRenderer = new ShapeRenderer();
     }
 
     public void setImpactListener(StoneImpactListener listener) {
@@ -78,6 +77,9 @@ public class StoneManager {
 
     public void renderTrajectory(Player player, Camera camera) {
         if (!isCharging) return;
+        if (shapeRenderer == null) {
+            shapeRenderer = new ShapeRenderer();
+        }
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);

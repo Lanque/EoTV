@@ -69,34 +69,31 @@ public class Enemy {
         targetPos = new Vector2(x, y);
         spawnPos = new Vector2(x, y);
 
-        // 2. TEKSTUURID JA ANIMATSIOON (TÃ¤pselt nagu Player klassis)
-        texture = new Texture(Gdx.files.internal("images/characters.png"));
+        // 2. TEXTURE/ANIMATION (skip in headless)
+        if (Gdx.gl != null) {
+            texture = new Texture(Gdx.files.internal("images/characters.png"));
 
-        // --- SIIN SAAD PIKSLEID MUUTA ---
-        int frameWidth = 20;  // Ãœhe kaadri laius
-        int frameHeight = 35; // Ãœhe kaadri kÃµrgus
+            int frameWidth = 20;
+            int frameHeight = 35;
+            int startX = 9;
+            int startY = 3;
+            int padding = 12;
 
-        // ORANÅ½ TEGELANE on 1. reas (kÃµige Ã¼leval).
-        // Playeril oli startY = 35. Enemy jaoks paneme vÃ¤iksema numbri.
-        int startX = 9;
-        int startY = 3;  // <--- MUUDA SEDA: 3 peaks olema Ã¼lemine rida
-        int padding = 12; // Vahe piltide vahel
+            TextureRegion[] walkFrames = new TextureRegion[4];
 
-        TextureRegion[] walkFrames = new TextureRegion[4];
+            for (int i = 0; i < 4; i++) {
+                walkFrames[i] = new TextureRegion(
+                    texture,
+                    startX + (i * (frameWidth + padding)),
+                    startY,
+                    frameWidth,
+                    frameHeight
+                );
+            }
 
-        for (int i = 0; i < 4; i++) {
-            walkFrames[i] = new TextureRegion(
-                texture,
-                startX + (i * (frameWidth + padding)),
-                startY,
-                frameWidth,
-                frameHeight
-            );
+            walkAnimation = new Animation<>(0.15f, walkFrames);
+            idleFrame = new TextureRegion(texture, startX, startY, frameWidth, frameHeight);
         }
-
-        walkAnimation = new Animation<>(0.15f, walkFrames);
-        // Seismise pilt on esimene kaader
-        idleFrame = new TextureRegion(texture, startX, startY, frameWidth, frameHeight);
 
         stateTime = 0f;
 
@@ -135,6 +132,7 @@ public class Enemy {
     // --- JOONISTAMINE ---
     public void render(SpriteBatch batch) {
         if (!active) return;
+        if (texture == null || walkAnimation == null || idleFrame == null) return;
         stateTime += Gdx.graphics.getDeltaTime();
 
         TextureRegion currentFrame;
@@ -326,3 +324,5 @@ public class Enemy {
     }
 
 }
+
+

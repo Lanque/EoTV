@@ -25,6 +25,22 @@ public class NetMessages {
         public Player.Role role;
     }
 
+    public static class CreateLobbyRequest {
+        public Player.Role preferredRole;
+    }
+
+    public static class JoinLobbyRequest {
+        public int lobbyId;
+        public Player.Role preferredRole;
+    }
+
+    public static class LobbyJoinedResponse {
+        public boolean success;
+        public int lobbyId;
+        public boolean isHost;
+        public String message;
+    }
+
     public static class StartGame {
         public int playerId;
         public Player.Role role;

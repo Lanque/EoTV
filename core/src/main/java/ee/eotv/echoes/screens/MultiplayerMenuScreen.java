@@ -19,7 +19,6 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import ee.eotv.echoes.Main;
 import ee.eotv.echoes.entities.Player;
 import ee.eotv.echoes.net.NetworkClient;
-import ee.eotv.echoes.net.NetworkServer;
 import ee.eotv.echoes.net.NetMessages;
 
 import java.io.IOException;
@@ -29,12 +28,11 @@ public class MultiplayerMenuScreen implements Screen {
     private final Stage stage;
     private Skin skin;
 
-    private NetworkServer server;
     private NetworkClient client;
 
     private Player.Role selectedRole = Player.Role.FLASHLIGHT;
-    private boolean isHosting = false;
     private boolean isWaiting = false;
+    private boolean lobbyReady = false;
 
     private Label statusLabel;
     private TextButton hostBtn;
@@ -44,6 +42,7 @@ public class MultiplayerMenuScreen implements Screen {
     private TextButton backBtn;
     private TextButton cancelBtn;
     private TextField ipField;
+    private TextField lobbyField;
 
     public MultiplayerMenuScreen(Main game) {
         this.game = game;
@@ -101,12 +100,16 @@ public class MultiplayerMenuScreen implements Screen {
         ipField = new TextField("127.0.0.1", skin);
         ipField.setMessageText("Server IP");
 
+        lobbyField = new TextField("1", skin);
+        lobbyField.setMessageText("Lobby ID");
+
         cancelBtn = new TextButton("CANCEL", skin);
         cancelBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
                 stopNetwork();
                 isWaiting = false;
+                lobbyReady = false;
                 statusLabel.setText("");
             }
         });
@@ -126,6 +129,7 @@ public class MultiplayerMenuScreen implements Screen {
         table.add(stonesBtn).width(200).height(45).pad(6).row();
         table.add(new Label("CONNECT", skin)).padTop(20).padBottom(10).row();
         table.add(ipField).width(240).height(40).pad(6).row();
+        table.add(lobbyField).width(240).height(40).pad(6).row();
         table.add(hostBtn).width(200).height(45).pad(6).row();
         table.add(joinBtn).width(200).height(45).pad(6).row();
         table.add(statusLabel).padTop(20).row();
@@ -137,13 +141,14 @@ public class MultiplayerMenuScreen implements Screen {
 
     private void startHosting() {
         stopNetwork();
-        isHosting = true;
         isWaiting = true;
-        statusLabel.setText("Hosting... waiting for player.");
+        lobbyReady = false;
+        statusLabel.setText("Connecting to server...");
 
-        server = new NetworkServer();
+        client = new NetworkClient();
         try {
-            server.start(selectedRole);
+            client.connect(ipField.getText());
+            client.createLobby(selectedRole);
         } catch (IOException e) {
             statusLabel.setText("Failed to host: " + e.getMessage());
             isWaiting = false;
@@ -152,12 +157,17 @@ public class MultiplayerMenuScreen implements Screen {
 
     private void startJoining() {
         stopNetwork();
-        isHosting = false;
         isWaiting = true;
+        lobbyReady = false;
         statusLabel.setText("Connecting...");
         client = new NetworkClient();
         try {
-            client.connect(ipField.getText(), selectedRole);
+            int lobbyId = Integer.parseInt(lobbyField.getText().trim());
+            client.connect(ipField.getText());
+            client.joinLobby(lobbyId, selectedRole);
+        } catch (NumberFormatException e) {
+            statusLabel.setText("Invalid lobby ID.");
+            isWaiting = false;
         } catch (IOException e) {
             statusLabel.setText("Failed to connect: " + e.getMessage());
             isWaiting = false;
@@ -201,28 +211,30 @@ public class MultiplayerMenuScreen implements Screen {
     @Override
     public void render(float delta) {
         if (isWaiting) {
-            if (isHosting && server != null && server.isGameStarted()) {
-                game.setScreen(new MultiplayerGameScreen(game, server, selectedRole, true));
-            }
-
-            if (!isHosting && client != null) {
+            if (client != null) {
                 if (client.isDisconnected()) {
-                    statusLabel.setText("Disconnected from host.");
+                    statusLabel.setText("Disconnected from server.");
                     isWaiting = false;
                     stopNetwork();
                 }
 
-                NetMessages.JoinResponse response = client.getJoinResponse();
-                if (response != null && !response.accepted) {
-                    statusLabel.setText(response.message);
+                NetMessages.LobbyJoinedResponse response = client.getLobbyResponse();
+                if (response != null && !response.success) {
+                    statusLabel.setText(response.message == null ? "Lobby join failed." : response.message);
                     isWaiting = false;
-                } else if (response != null && response.accepted) {
-                    statusLabel.setText("Waiting for host to start...");
+                } else if (response != null && response.success && !lobbyReady) {
+                    lobbyReady = true;
+                    lobbyField.setText(String.valueOf(response.lobbyId));
+                    if (response.isHost) {
+                        statusLabel.setText("Lobby " + response.lobbyId + " created. Waiting for player...");
+                    } else {
+                        statusLabel.setText("Joined lobby " + response.lobbyId + ". Waiting to start...");
+                    }
                 }
 
                 NetMessages.StartGame startGame = client.getStartGame();
                 if (startGame != null) {
-                    game.setScreen(new MultiplayerGameScreen(game, client, startGame.role, false));
+                    game.setScreen(new MultiplayerGameScreen(game, client, startGame));
                 }
             }
         }
@@ -234,10 +246,6 @@ public class MultiplayerMenuScreen implements Screen {
     }
 
     private void stopNetwork() {
-        if (server != null) {
-            server.stop();
-            server = null;
-        }
         if (client != null) {
             client.stop();
             client = null;

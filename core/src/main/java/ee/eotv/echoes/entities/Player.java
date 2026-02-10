@@ -77,47 +77,53 @@ public class Player {
         shape.dispose();
 
         // VALGUS: Ei kinnita enam kehale (attachToBody puudub), et saaksime ise suunda ja asukohta määrata
-        flashlight = new ConeLight(rayHandler, 200, new Color(1f, 1f, 0.9f, 1f), 45f, x, y, 0, 35f);
-        flashlight.setSoft(true);
-
-        // --- TEKSTUURID JA ANIMATSIOON (KÄSITSI LÕIKAMINE) ---
-        texture = new Texture(Gdx.files.internal("images/characters.png"));
-
-        // SIIN SAAD MUUTA KOORDINAATE, KUI PILT ON NIHES:
-        int frameWidth = 20;  // Ühe kaadri laius
-        int frameHeight = 35; // Ühe kaadri kõrgus
-
-        // Rüütel on 2. reas. (1. rida on 0-15px, 2. rida algab 16px pealt)
-        int startX = 9;
-        int startY = 35;
-        int padding = 12; // Kui piltide vahel on tühimik, suurenda seda (nt 1)
-
-        TextureRegion[] walkFrames = new TextureRegion[4];
-
-        for (int i = 0; i < 4; i++) {
-            walkFrames[i] = new TextureRegion(
-                texture,
-                startX + (i * (frameWidth + padding)),
-                startY,
-                frameWidth,
-                frameHeight
-            );
+        if (rayHandler != null) {
+            flashlight = new ConeLight(rayHandler, 200, new Color(1f, 1f, 0.9f, 1f), 45f, x, y, 0, 35f);
+            flashlight.setSoft(true);
+        } else {
+            flashlight = null;
         }
 
-        runAnimation = new Animation<>(0.1f, walkFrames);
-        // Seismise pilt on esimene kaader
-        idleFrame = new TextureRegion(texture, startX, startY, frameWidth, frameHeight);
+        // --- TEXTURE/ANIMATION (skip in headless) ---
+        if (Gdx.gl != null) {
+            texture = new Texture(Gdx.files.internal("images/characters.png"));
+
+            int frameWidth = 20;
+            int frameHeight = 35;
+
+            int startX = 9;
+            int startY = 35;
+            int padding = 12;
+
+            TextureRegion[] walkFrames = new TextureRegion[4];
+
+            for (int i = 0; i < 4; i++) {
+                walkFrames[i] = new TextureRegion(
+                    texture,
+                    startX + (i * (frameWidth + padding)),
+                    startY,
+                    frameWidth,
+                    frameHeight
+                );
+            }
+
+            runAnimation = new Animation<>(0.1f, walkFrames);
+            idleFrame = new TextureRegion(texture, startX, startY, frameWidth, frameHeight);
+        }
 
         stateTime = 0f;
     }
 
     public void render(SpriteBatch batch) {
+        if (texture == null || runAnimation == null || idleFrame == null) return;
         stateTime += Gdx.graphics.getDeltaTime();
 
         // 1. Uuendame taskulambi asukohta ja suunda käsitsi
         // See tagab, et valgus püsib täpselt mängija peal ja pöörleb sujuvalt
-        flashlight.setPosition(body.getPosition().x, body.getPosition().y);
-        flashlight.setDirection(currentAngle);
+        if (flashlight != null) {
+            flashlight.setPosition(body.getPosition().x, body.getPosition().y);
+            flashlight.setDirection(currentAngle);
+        }
 
         // 2. Valime õige kaadri (animatsioon või seismine)
         TextureRegion currentFrame;
@@ -203,7 +209,9 @@ public class Player {
 
         if (input.toggleLight && canUseFlashlight() && !isDowned) {
             isLightOn = !isLightOn;
-            flashlight.setActive(isLightOn);
+            if (flashlight != null) {
+                flashlight.setActive(isLightOn);
+            }
             if (actionListener != null) {
                 actionListener.onLightToggle(this, isLightOn);
             } else if (sm != null) {
@@ -253,7 +261,9 @@ public class Player {
             stepTimer += delta;
             float currentInterval = isRunning ? 0.3f : 0.6f;
 
-            runAnimation.setFrameDuration(isRunning ? 0.07f : 0.15f);
+            if (runAnimation != null) {
+                runAnimation.setFrameDuration(isRunning ? 0.07f : 0.15f);
+            }
 
             if (stepTimer >= currentInterval) {
                 float echoRadius = isRunning ? 32f : 18f;
@@ -282,7 +292,9 @@ public class Player {
 
     public void setPosition(float x, float y) {
         body.setTransform(x, y, body.getAngle());
-        flashlight.setPosition(x, y); // Uuendame ka valgust koheselt
+        if (flashlight != null) {
+            flashlight.setPosition(x, y); // Uuendame ka valgust koheselt
+        }
     }
 
     public void setNetworkState(float x, float y, float vx, float vy, boolean lightOn, boolean running,
@@ -291,7 +303,9 @@ public class Player {
         body.setTransform(x, y, body.getAngle());
         body.setLinearVelocity(vx, vy);
         isLightOn = lightOn && canUseFlashlight(roleValue);
-        flashlight.setActive(isLightOn);
+        if (flashlight != null) {
+            flashlight.setActive(isLightOn);
+        }
         isRunning = running;
         isMoving = moving;
         stamina = staminaValue;
@@ -310,7 +324,9 @@ public class Player {
         this.role = role;
         if (!canUseFlashlight()) {
             isLightOn = false;
-            flashlight.setActive(false);
+            if (flashlight != null) {
+                flashlight.setActive(false);
+            }
         }
     }
 
@@ -320,7 +336,9 @@ public class Player {
         isDowned = downed;
         if (isDowned) {
             isRunning = false;
-            flashlight.setActive(false);
+            if (flashlight != null) {
+                flashlight.setActive(false);
+            }
             isLightOn = false;
         }
     }
@@ -355,6 +373,10 @@ public class Player {
     }
 
     public void dispose() {
-        texture.dispose();
+        if (texture != null) texture.dispose();
     }
 }
+
+
+
+

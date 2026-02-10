@@ -11,6 +11,9 @@ public class Network {
     public static void register(Kryo kryo) {
         kryo.register(NetMessages.JoinRequest.class);
         kryo.register(NetMessages.JoinResponse.class);
+        kryo.register(NetMessages.CreateLobbyRequest.class);
+        kryo.register(NetMessages.JoinLobbyRequest.class);
+        kryo.register(NetMessages.LobbyJoinedResponse.class);
         kryo.register(NetMessages.StartGame.class);
         kryo.register(NetMessages.InputState.class);
         kryo.register(NetMessages.ThrowStone.class);

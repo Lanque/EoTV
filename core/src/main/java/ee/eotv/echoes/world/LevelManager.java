@@ -65,14 +65,22 @@ public class LevelManager {
     };
 
     public LevelManager() {
+        this(true);
+    }
+
+    public LevelManager(boolean enableLighting) {
         world = new World(new Vector2(0, 0), true);
         contactListener = new WorldContactListener();
         world.setContactListener(contactListener);
 
-        rayHandler = new RayHandler(world);
-        rayHandler.setAmbientLight(0f, 0f, 0f, 0f);
-        rayHandler.setShadows(true);
-        rayHandler.setBlurNum(1);
+        if (enableLighting) {
+            rayHandler = new RayHandler(world);
+            rayHandler.setAmbientLight(0f, 0f, 0f, 0f);
+            rayHandler.setShadows(true);
+            rayHandler.setBlurNum(1);
+        } else {
+            rayHandler = null;
+        }
 
         createLevelFromMap();
         setExitUnlocked(generators.isEmpty());
@@ -108,7 +116,7 @@ public class LevelManager {
     public void setExitUnlocked(boolean unlocked) {
         if (exitUnlocked == unlocked) return;
         exitUnlocked = unlocked;
-        if (exitUnlocked && exitZone != null && exitLight == null) {
+        if (rayHandler != null && exitUnlocked && exitZone != null && exitLight == null) {
             float centerX = exitZone.getBounds().x + exitZone.getBounds().width * 0.5f;
             float centerY = exitZone.getBounds().y + exitZone.getBounds().height * 0.5f;
             exitLight = new PointLight(rayHandler, 64, new Color(1f, 0.95f, 0.8f, 1f), 7f, centerX, centerY);
@@ -207,6 +215,7 @@ public class LevelManager {
     }
 
     public void addEcho(float x, float y, float radius, Color color) {
+        if (rayHandler == null) return;
         PointLight echo = new PointLight(rayHandler, 64, color, radius, x, y);
         echo.setSoft(true);
         activeEchoes.add(echo);
@@ -236,6 +245,8 @@ public class LevelManager {
     public void dispose() {
         if (exitLight != null) exitLight.remove();
         world.dispose();
-        rayHandler.dispose();
+        if (rayHandler != null) {
+            rayHandler.dispose();
+        }
     }
 }
