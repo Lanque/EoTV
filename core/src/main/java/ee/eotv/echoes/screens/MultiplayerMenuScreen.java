@@ -81,7 +81,7 @@ public class MultiplayerMenuScreen implements Screen {
             }
         });
 
-        hostBtn = new TextButton("HOST", skin);
+        hostBtn = new TextButton("CREATE LOBBY", skin);
         hostBtn.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
@@ -150,7 +150,7 @@ public class MultiplayerMenuScreen implements Screen {
             client.connect(ipField.getText());
             client.createLobby(selectedRole);
         } catch (IOException e) {
-            statusLabel.setText("Failed to host: " + e.getMessage());
+        statusLabel.setText("Failed to create lobby: " + e.getMessage());
             isWaiting = false;
         }
     }

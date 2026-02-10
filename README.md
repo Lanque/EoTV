@@ -31,29 +31,39 @@ The game features an asymmetric information system: lighting is limited, and ene
 * **Stones:** Can throw stones to distract enemies or trigger echoes to see surroundings.
 
 
-4. **Host/Join:** One player acts as the **Host** (Server), the other joins as a **Client** using the Host's IP address.
+4. **Create/Join Lobby:** Start the dedicated server first. One player clicks **HOST** to create a lobby (gets a Lobby ID), the other player connects with the server IP and Lobby ID.
 5. **Objective:** Locate red generators on the map. Hold **E** to repair them. The other player must defend the repairer.
 6. **Win Condition:** Once all generators are fixed, the **Exit Zone** (Green area) unlocks. Both players must stand in the zone to win.
 7. **Revive:** If a player is attacked, they enter a "Downed" state. The other player must revive them by holding **E**.
 
 ### Installation and Starting the Game:
 
-Since the project uses a single JAR for both Host and Client logic, the installation process is unified.
-
 #### 1. Build the Project
 
 * Clone this repository.
 * Open a terminal in the project root directory.
 * Run the Gradle build command:
-* **Windows:** `.\gradlew lwjgl3:dist`
-* **Mac/Linux:** `./gradlew lwjgl3:dist`
+* **Client (Windows):** `.\gradlew lwjgl3:dist`
+* **Client (Mac/Linux):** `./gradlew lwjgl3:dist`
+* **Server (Windows):** `.\gradlew server:jar`
+* **Server (Mac/Linux):** `./gradlew server:jar`
 
 
 
-#### 2. Run the Game
+#### 2. Run the Dedicated Server
 
-* Navigate to the build directory: `lwjgl3/build/libs/`
-* Run the JAR file:
+* Navigate to: `server/build/libs/`
+* Run the server JAR:
+```bash
+java -jar EchoesOfTheVoid-server.jar
+```
+
+*(Note: Ensure the `assets` folder is accessible relative to the JAR file if needed.)*
+
+#### 3. Run the Client
+
+* Navigate to: `lwjgl3/build/libs/`
+* Run the client JAR:
 ```bash
 java -jar lwjgl3-1.0.0.jar
 
@@ -92,12 +102,8 @@ java -jar lwjgl3-1.0.0.jar
 
 ### Connecting the Client to TalTech Server:
 
-This game operates on a **Host-Client (Peer-to-Peer)** architecture.
+This game operates on a **Dedicated Server** architecture.
 
-* **To Play:** One student runs the game and clicks **HOST**.
-* **To Connect:** The second student runs the game, enters the Host's IP address (e.g., `192.168.1.X` or `127.0.0.1` if testing locally), and clicks **JOIN**.
-
-*If a dedicated headless server is required for grading:*
-
-1. Run the server-specific JAR (if generated via `server:dist`).
-2. Clients connect to the server's IP on TCP port **54555** and UDP port **54777**.
+1. Run the server JAR on the TalTech server.
+2. Clients connect to the server IP on TCP port **54555** and UDP port **54777**.
+3. One client creates a lobby (**HOST** button), the other joins with the same server IP and Lobby ID.
